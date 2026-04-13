@@ -1,0 +1,87 @@
+// ===============================================================
+// Assumed Data Model (Synced with Supabase Schema)
+// ===============================================================
+//
+// Collection: profiles
+// Document ID: {userId}
+// Fields: id, email, full_name, univ_name, role (ADMIN/USER), created_at
+//
+// Collection: clubs
+// Document ID: {clubId}
+// Fields: id, name, logo_url, description, admin_id, created_at
+//
+// Collection: schedules
+// Document ID: {scheduleId}
+// Fields: id, club_id, title, description, date, type (GENERAL/ASSIGNMENT), qr_code_token, created_at
+//
+// Collection: attendance
+// Document ID: {attendanceId}
+// Fields: id, schedule_id, user_id, status (PRESENT/ABSENT), marked_at
+//
+// Collection: submissions
+// Document ID: {submissionId}
+// Fields: id, schedule_id, user_id, file_url, content, submitted_at
+//
+// Collection: activity_logs
+// Document ID: {logId}
+// Fields: id, user_id, title, content, image_url, created_at
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'ADMIN' ||
+         (request.auth.token.email == "lg771030kr@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    // Profiles
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+    }
+
+    // Clubs
+    match /clubs/{clubId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.admin_id == request.auth.uid);
+    }
+
+    // Schedules
+    match /schedules/{scheduleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && (isAdmin() || get(/databases/$(database)/documents/clubs/$(request.resource.data.club_id)).data.admin_id == request.auth.uid);
+    }
+
+    // Attendance
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.user_id) || isAdmin());
+      allow create, update: if isAuthenticated(); // Simplified for MVP, should be scoped in production
+    }
+
+    // Submissions
+    match /submissions/{submissionId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.user_id) || isAdmin());
+      allow create, update: if isAuthenticated() && isOwner(request.resource.data.user_id);
+    }
+
+    // Activity Logs
+    match /activity_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && isOwner(request.resource.data.user_id);
+    }
+  }
+}

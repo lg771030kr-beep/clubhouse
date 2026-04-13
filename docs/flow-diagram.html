@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Club DX — UI Flow Diagram</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif;
+    background: #1a1a1a;
+    min-height: 100vh;
+    padding: 48px 24px 80px;
+    color: #fff;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .header .eyebrow {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #555;
+    margin-bottom: 10px;
+  }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    color: #fff;
+  }
+  .header p {
+    font-size: 12px;
+    color: #555;
+    margin-top: 8px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+  .leg {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #666;
+  }
+  .leg-line {
+    width: 28px;
+    height: 2px;
+  }
+  .leg-solid { background: #fff; }
+  .leg-dashed {
+    background: repeating-linear-gradient(
+      90deg,
+      #f5a623 0, #f5a623 5px,
+      transparent 5px, transparent 10px
+    );
+  }
+
+  .diagram-wrap {
+    background: #111;
+    border-radius: 24px;
+    border: 1px solid #2a2a2a;
+    padding: 40px 20px;
+    overflow-x: auto;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+
+  /* Override mermaid default theme colors */
+  .mermaid {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* START node */
+  .mermaid .start-node rect,
+  .mermaid .start-node circle {
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="eyebrow">Club DX · Screen Interaction</div>
+  <h1>UI 플로우 다이어그램</h1>
+  <p>버튼 클릭 → 화면 전환 · 모달 노출 · 복귀 경로를 모두 포함</p>
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="leg-line leg-solid"></div>구현 완료 경로</div>
+  <div class="leg"><div class="leg-line leg-dashed"></div>🚧 미구현 경로 (점선)</div>
+</div>
+
+<div class="diagram-wrap">
+<div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1e1e1e",
+    "primaryTextColor": "#ffffff",
+    "primaryBorderColor": "#444444",
+    "lineColor": "#888888",
+    "secondaryColor": "#2a2a2a",
+    "tertiaryColor": "#111111",
+    "background": "#111111",
+    "mainBkg": "#1e1e1e",
+    "nodeBorder": "#444",
+    "clusterBkg": "#161616",
+    "clusterBorder": "#333",
+    "titleColor": "#ffffff",
+    "edgeLabelBackground": "#1a1a1a",
+    "fontFamily": "Apple SD Gothic Neo, -apple-system, sans-serif",
+    "fontSize": "13px"
+  }
+} }%%
+
+flowchart TD
+
+  %% ── 진입점 ──────────────────────────────────────
+  START([" 🚀  앱 시작 "]):::startNode
+
+  LOGIN["🔐 로그인 페이지\n────────────────\n이메일 · 비밀번호 입력\n/login\n🚧 미구현"]:::stubNode
+
+  ROLECHECK{" role 확인\nAuthContext "}:::decisionNode
+
+  START -->|"앱 실행"| LOGIN
+  LOGIN -->|"✅ 로그인 성공\n(MVP: 더미 자동로그인)"| ROLECHECK
+
+  %% ── 관리자 경로 ─────────────────────────────────
+  subgraph ADMIN["  👑  관리자 모드  ·  흰 배경  "]
+
+    ADMIN_DASH["🏠 관리자 대시보드\n─────────────────────\n• 이번달 출석률 (도넛)\n• 미제출 과제 수\n• 인기 동아리 TOP\n/admin"]:::adminNode
+
+    subgraph ADMIN_NAV["  사이드바 네비게이션  "]
+      direction LR
+      N_MEM["👥 부원 관리"]:::navNode
+      N_ATT["📋 출석 관리"]:::navNode
+      N_ASS["📝 과제 현황"]:::navNode
+      N_SCH["📅 일정 관리"]:::navNode
+      N_REC["📣 모집 관리"]:::navNode
+      N_PRJ["🗂 프로젝트"]:::navNode
+    end
+
+    MEMBERS["👥 부원 관리\n─────────────────────\n• 전체 부원 목록\n• 이름 / 역할 검색\n• 역할 뱃지 표시\n/admin/members"]:::adminNode
+
+    ATTENDANCE["📋 출석 관리\n─────────────────────\n• 날짜 선택 (?date=)\n• 출석 / 결석 현황\n• URL로 날짜 딥링크\n/admin/attendance"]:::adminNode
+
+    ASSIGNMENTS["📝 과제 현황\n─────────────────────\n• 부원별 제출 여부\n• ?filter=pending 지원\n/admin/assignments"]:::adminNode
+
+    FILTER_BADGE["🏷 미제출 필터 활성\n─────────────────────\n• 검정 뱃지 노출\n• 미제출자만 표시\n• 강조 테두리 카드"]:::adminNode
+
+    SCHEDULES["📅 일정 관리\n─────────────────────\n• 일정 CRUD\n• 날짜 · 제목 · 설명\n/admin/schedules"]:::adminNode
+
+    RECRUIT_ADMIN["📣 모집 관리\n─────────────────────\n• 공고 목록\n• 지원자 목록\n/admin/recruitment"]:::adminNode
+
+    APPROVE["✅ 가입 승인 처리\n─────────────────────\n• membership status 업데이트\n• 🚧 미구현"]:::stubNode
+
+    PROJECTS_ADMIN["🗂 프로젝트 관리\n─────────────────────\n• 프로젝트 목록\n/admin/projects"]:::adminNode
+
+    MEMBER_MODAL["👤 부원 상세 모달\n─────────────────────\n• 프로필 · 역할 뱃지\n• 출석률 도넛차트\n• 과제 제출 현황\n• MemberDetailModal\n  (Supabase UUID 연동)"]:::modalNode
+
+    NUDGE["📨 독촉 메시지 전송\n─────────────────────\n• 🚧 미구현\n실제 알림 전송 없음"]:::stubNode
+
+  end
+
+  %% ── 부원 경로 ─────────────────────────────────
+  subgraph USER["  🙋  부원 모드  ·  검은 배경  "]
+
+    USER_DASH["🏠 부원 대시보드\n─────────────────────\n• 이번달 출석 횟수\n• 남은 과제 수\n• 가입 동아리 목록\n• 주간 로드맵 미리보기\n/dashboard"]:::userNode
+
+    ROADMAP["🗓 주간 로드맵\n─────────────────────\n• 주차별 타임라인\n• 현재 주차 강조\n• 일정 · 과제 표시\n/roadmap"]:::userNode
+
+    WEEK_MODAL["📅 주차 상세 모달\n─────────────────────\n• 해당 주 일정 목록\n• 과제 제출 현황\n• AnimatePresence 애니"]:::modalNode
+
+    SUBMIT_UI["📤 과제 제출 폼\n─────────────────────\n• 🚧 미구현\nUI 자체가 없음"]:::stubNode
+
+    PORTFOLIO["💼 내 포트폴리오\n─────────────────────\n• 참여 프로젝트\n• 활동 이력\n/portfolio"]:::userNode
+
+    CLUBS["🏛 동아리 탐색\n─────────────────────\n• 가입한 동아리\n• 전체 동아리 목록\n/clubs"]:::userNode
+
+    CLUB_DETAIL["🏠 동아리 상세\n─────────────────────\n• 소개 · 멤버 목록\n• 공개 모집 공고\n/clubs/:id"]:::userNode
+
+    CONTACT_MODAL["💬 컨택 모달\n─────────────────────\n• 🚧 미구현\n실제 메시지 전송 없음"]:::stubNode
+
+    APPLY_FLOW["📨 가입 신청 제출\n─────────────────────\n• DB insert 성공\n• 🚧 관리자 승인 미연결"]:::stubNode
+
+    PROJECTS_USER["📁 내 프로젝트\n─────────────────────\n• 참여 프로젝트 카드\n/projects"]:::userNode
+
+    PROJECT_DETAIL["📄 프로젝트 상세\n─────────────────────\n• 제목 · 설명 · 멤버\n• 기술 스택 태그\n/projects/:id"]:::userNode
+
+    PROJECT_404["🔍 404 페이지\n─────────────────────\n• 존재하지 않는 ID\n• 뒤로가기 버튼\n• navigate(-1)"]:::adminNode
+
+    RECRUIT_USER["📋 공고 탐색\n─────────────────────\n• 전체 모집 공고\n/recruitment"]:::userNode
+
+    RECRUIT_DETAIL["📄 공고 상세\n─────────────────────\n• 공고 내용\n• 지원 기간\n/recruitment/:id"]:::userNode
+
+  end
+
+  %% ── 공용 ─────────────────────────────────────
+  SIGNOUT["🚪 로그아웃\n─────────────────\nsupabase.auth.signOut()\nnavigate('/login')"]:::sharedNode
+
+  %% ── 엣지: 진입 ──────────────────────────────
+  ROLECHECK -->|"role = ADMIN 또는 LEADER"| ADMIN_DASH
+  ROLECHECK -->|"role = MEMBER"| USER_DASH
+
+  %% ── 엣지: 관리자 네비 ──────────────────────
+  ADMIN_DASH -->|"👥 부원 관리 탭 클릭"| MEMBERS
+  ADMIN_DASH -->|"📋 출석 관리 탭 클릭"| ATTENDANCE
+  ADMIN_DASH -->|"📝 과제 현황 탭 클릭"| ASSIGNMENTS
+  ADMIN_DASH -->|"📅 일정 관리 탭 클릭"| SCHEDULES
+  ADMIN_DASH -->|"📣 모집 관리 탭 클릭"| RECRUIT_ADMIN
+  ADMIN_DASH -->|"🗂 프로젝트 탭 클릭"| PROJECTS_ADMIN
+
+  %% ── 엣지: 모달 연결 ────────────────────────
+  MEMBERS   -->|"부원 행 클릭"| MEMBER_MODAL
+  ATTENDANCE -->|"부원 행 클릭"| MEMBER_MODAL
+  ASSIGNMENTS -->|"부원 행 클릭"| MEMBER_MODAL
+  MEMBER_MODAL -->|"✕ 닫기 클릭"| ATTENDANCE
+
+  %% ── 엣지: 과제 필터 ────────────────────────
+  ASSIGNMENTS -->|"URL ?filter=pending 진입"| FILTER_BADGE
+  FILTER_BADGE -->|"✕ 전체 보기 클릭"| ASSIGNMENTS
+  FILTER_BADGE -->|"부원 행 클릭"| MEMBER_MODAL
+  FILTER_BADGE -.->|"🚧 독촉 전송 버튼 클릭"| NUDGE
+
+  %% ── 엣지: 모집 승인 ────────────────────────
+  RECRUIT_ADMIN -.->|"🚧 승인 버튼 클릭"| APPROVE
+
+  %% ── 엣지: 부원 네비 ────────────────────────
+  USER_DASH -->|"이번주 로드맵 클릭"| ROADMAP
+  USER_DASH -->|"포트폴리오 탭 클릭"| PORTFOLIO
+  USER_DASH -->|"동아리 탭 클릭"| CLUBS
+  USER_DASH -->|"프로젝트 탭 클릭"| PROJECTS_USER
+  USER_DASH -->|"공고 탭 클릭"| RECRUIT_USER
+
+  %% ── 엣지: 로드맵 ────────────────────────────
+  ROADMAP -->|"주차 카드 클릭"| WEEK_MODAL
+  WEEK_MODAL -->|"✕ 닫기 클릭"| ROADMAP
+  WEEK_MODAL -.->|"🚧 과제 제출하기 클릭"| SUBMIT_UI
+
+  %% ── 엣지: 동아리 ────────────────────────────
+  CLUBS -->|"동아리 카드 클릭"| CLUB_DETAIL
+  CLUB_DETAIL -.->|"🚧 지원하기 버튼 클릭"| APPLY_FLOW
+  CLUB_DETAIL -.->|"🚧 멤버 이름 클릭"| CONTACT_MODAL
+  CONTACT_MODAL -.->|"🚧 닫기 클릭"| CLUB_DETAIL
+
+  %% ── 엣지: 프로젝트 ─────────────────────────
+  PROJECTS_USER -->|"카드 클릭 (ID 존재)"| PROJECT_DETAIL
+  PROJECTS_USER -->|"카드 클릭 (ID 없음)"| PROJECT_404
+  PROJECT_DETAIL -->|"← 목록으로 돌아가기 클릭"| PROJECTS_USER
+  PROJECT_404 -->|"← 목록으로 돌아가기 클릭"| PROJECTS_USER
+
+  %% ── 엣지: 공고 ──────────────────────────────
+  RECRUIT_USER -->|"공고 카드 클릭"| RECRUIT_DETAIL
+
+  %% ── 엣지: 모드 전환 & 로그아웃 ────────────
+  ADMIN_DASH <-->|"⇅ 모드 전환 toggleAdminMode()"| USER_DASH
+  ADMIN_DASH -->|"로그아웃 클릭"| SIGNOUT
+  USER_DASH  -->|"로그아웃 클릭"| SIGNOUT
+  SIGNOUT    -->|"navigate('/login')"| LOGIN
+
+  %% ── 스타일 정의 ─────────────────────────────
+  classDef startNode    fill:#ffffff,color:#000000,stroke:#ffffff,stroke-width:2px,font-weight:900,border-radius:100px
+  classDef decisionNode fill:#2a2a2a,color:#ffffff,stroke:#555555,stroke-width:2px,font-weight:700
+  classDef adminNode    fill:#1a1a1a,color:#ffffff,stroke:#444444,stroke-width:1.5px,font-size:12px
+  classDef userNode     fill:#0d0d0d,color:#ffffff,stroke:#333333,stroke-width:1.5px,font-size:12px
+  classDef modalNode    fill:#222222,color:#ffffff,stroke:#666666,stroke-width:2px,stroke-dasharray:0,font-size:12px
+  classDef stubNode     fill:#2a1a00,color:#f5a623,stroke:#f5a623,stroke-width:2px,stroke-dasharray:6 3,font-size:12px
+  classDef navNode      fill:#111111,color:#888888,stroke:#333333,stroke-width:1px,font-size:11px
+  classDef sharedNode   fill:#0a0a0a,color:#ffffff,stroke:#555555,stroke-width:2px,font-size:12px
+
+</div>
+</div>
+
+<div style="text-align:center;margin-top:32px;font-size:10px;color:#333;font-weight:700;letter-spacing:.15em">
+  CLUB DX · UI FLOW DIAGRAM · 2026-03-22 &nbsp;·&nbsp; 실선 = 구현 완료 &nbsp;·&nbsp; 점선 + 주황 = 🚧 미구현
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    flowchart: {
+      rankSpacing: 60,
+      nodeSpacing: 40,
+      curve: 'basis',
+      padding: 20,
+    },
+    themeVariables: {
+      primaryColor: '#1e1e1e',
+      primaryTextColor: '#ffffff',
+      primaryBorderColor: '#444444',
+      lineColor: '#666666',
+      secondaryColor: '#2a2a2a',
+      tertiaryColor: '#111111',
+      background: '#111111',
+      mainBkg: '#1e1e1e',
+      nodeBorder: '#444',
+      clusterBkg: '#141414',
+      clusterBorder: '#2a2a2a',
+      titleColor: '#ffffff',
+      edgeLabelBackground: '#1a1a1a',
+      fontFamily: 'Apple SD Gothic Neo, -apple-system, sans-serif',
+      fontSize: '13px',
+    }
+  });
+</script>
+
+</body>
+</html>

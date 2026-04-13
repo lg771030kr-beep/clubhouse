@@ -1,0 +1,378 @@
+/* ── Google Fonts: Inter ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+@import "tailwindcss";
+
+/* ════════════════════════════════════════
+   CSS 변수 — 순수 흑백 (Monochrome) 프리미엄 테마
+════════════════════════════════════════ */
+:root {
+  /* ── Dark Mode (User Dashboard) ── */
+  --color-bg-deep:     #0a0a0a;
+  --color-bg-card:     rgba(255,255,255,0.08);
+  --color-bg-card-deep: rgba(20,20,20,0.80);
+  --color-text:        #ffffff;
+  --color-text-secondary: rgba(255,255,255,0.70);
+  --color-text-tertiary:  rgba(255,255,255,0.50);
+  --color-border:      rgba(255,255,255,0.12);
+
+  /* ── Light Mode (Admin Dashboard) ── */
+  --color-light-bg:    #ffffff;
+  --color-light-bg-card: rgba(0,0,0,0.04);
+  --color-light-text:  #000000;
+  --color-light-text-secondary: rgba(0,0,0,0.70);
+  --color-light-text-tertiary:  rgba(0,0,0,0.50);
+  --color-light-border: rgba(0,0,0,0.12);
+
+  /* ── Shared ── */
+  --glow-card:         inset 0 1px 0 rgba(255,255,255,0.05),
+                       inset 0 -1px 0 rgba(0,0,0,0.20),
+                       0 8px 32px rgba(0,0,0,0.25);
+}
+
+/* ════════════════════════════════════════
+   글로벌 베이스
+════════════════════════════════════════ */
+@layer base {
+  html { background: var(--color-bg-deep); scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.02em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 50%, #ebebeb 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #000000;
+  }
+
+  .lucide { stroke-width: 1.5 !important; }
+
+  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track  { background: rgba(0,0,0,0.06); }
+  ::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.30); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.50); }
+}
+
+/* ════════════════════════════════════════
+   유틸리티
+════════════════════════════════════════ */
+@layer utilities {
+
+  /* ── Dark Mode Cards ── */
+  .glass-card {
+    background: rgba(20,20,20,0.70);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.20);
+    border-radius: 1.5rem;
+  }
+
+  .glass-card-hover {
+    transition: box-shadow 0.28s ease, transform 0.28s ease, border-color 0.28s ease;
+  }
+  .glass-card-hover:hover {
+    border-color: rgba(255,255,255,0.20);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    transform: translateY(-3px);
+  }
+
+  .glass-card-dark {
+    background: rgba(15,15,15,0.85);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    border-radius: 1.5rem;
+  }
+
+  /* ── Light Mode Cards ── */
+  .glass-card-light {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    border-radius: 1.5rem;
+  }
+
+  .glass-card-light:hover {
+    border-color: rgba(0,0,0,0.15);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    transform: translateY(-3px);
+  }
+
+  /* ── 메트릭 카드 (수치 중심) ── */
+  .metric-card {
+    background: rgba(20,20,20,0.70);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.20);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .metric-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,255,255,0.20);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+
+  /* ── 메트릭 카드 (Light Mode) ── */
+  .metric-card-light {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .metric-card-light:hover {
+    transform: translateY(-4px);
+    border-color: rgba(0,0,0,0.15);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  }
+
+  /* ── 버튼 (Dark Mode) — 순백색 Pill ── */
+  .btn-cyan {
+    background: #ffffff;
+    color: #000000;
+    border-radius: 9999px;
+    box-shadow: 0 4px 16px rgba(255,255,255,0.25);
+    transition: box-shadow 0.22s ease, transform 0.15s ease;
+    font-weight: 600;
+  }
+  .btn-cyan:hover {
+    box-shadow: 0 6px 24px rgba(255,255,255,0.35);
+  }
+  .btn-cyan:active { transform: scale(0.97); }
+
+  /* ── 버튼 (Dark Mode) — Alternative ── */
+  .btn-indigo {
+    background: #ffffff;
+    color: #000000;
+    border-radius: 9999px;
+    box-shadow: 0 4px 16px rgba(255,255,255,0.25);
+    transition: box-shadow 0.22s ease, transform 0.15s ease;
+    font-weight: 600;
+  }
+  .btn-indigo:hover {
+    box-shadow: 0 6px 24px rgba(255,255,255,0.35);
+  }
+  .btn-indigo:active { transform: scale(0.97); }
+
+  /* ── 버튼 (Light Mode) — 검은색 Pill ── */
+  .btn-black {
+    background: #000000;
+    color: #ffffff;
+    border-radius: 9999px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.20);
+    transition: box-shadow 0.22s ease, transform 0.15s ease;
+    font-weight: 600;
+  }
+  .btn-black:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.30);
+  }
+  .btn-black:active { transform: scale(0.97); }
+
+  /* ── 버튼 (Light Mode) — Primary 검은색 ── */
+  .btn-primary {
+    background: #000000;
+    color: #ffffff;
+    border-radius: 9999px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.20);
+    transition: box-shadow 0.22s ease, transform 0.15s ease;
+    font-weight: 600;
+  }
+  .btn-primary:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.30);
+  }
+  .btn-primary:active { transform: scale(0.97); }
+
+  /* ── Ghost 버튼 (다크) ── */
+  .btn-ghost-dark {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 9999px;
+    color: rgba(255,255,255,0.80);
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    font-weight: 600;
+  }
+  .btn-ghost-dark:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.25);
+    color: #ffffff;
+  }
+
+  /* ── Ghost 버튼 (라이트) ── */
+  .btn-ghost-light {
+    background: rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 9999px;
+    color: rgba(0,0,0,0.75);
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    font-weight: 600;
+  }
+  .btn-ghost-light:hover {
+    background: rgba(0,0,0,0.10);
+    border-color: rgba(0,0,0,0.20);
+    color: #000000;
+  }
+
+  /* ── 프로그레스 트랙 (Dark) ── */
+  .progress-track {
+    background: rgba(255,255,255,0.12);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+  .progress-fill-cyan {
+    background: #ffffff;
+    border-radius: 9999px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .progress-fill-violet {
+    background: #ffffff;
+    border-radius: 9999px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .progress-fill-emerald {
+    background: #ffffff;
+    border-radius: 9999px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── 프로그레스 트랙 (Light) ── */
+  .progress-track-light {
+    background: rgba(0,0,0,0.12);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+  .progress-fill-black {
+    background: #000000;
+    border-radius: 9999px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── 상태 도트 (Dark) — 순백색 ── */
+  .dot-active   { width: 7px; height: 7px; border-radius: 50%; background: #ffffff; display: inline-block; flex-shrink: 0; }
+  .dot-success  { width: 7px; height: 7px; border-radius: 50%; background: #ffffff; display: inline-block; flex-shrink: 0; }
+  .dot-warning  { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.60); display: inline-block; flex-shrink: 0; }
+  .dot-danger   { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.40); display: inline-block; flex-shrink: 0; }
+  .dot-neutral  { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.30); display: inline-block; flex-shrink: 0; }
+  .dot-pulse    { animation: dot-pulse-anim 1.8s ease-in-out infinite; }
+  @keyframes dot-pulse-anim {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,255,255,0.50); }
+    50%       { opacity: 0.80; box-shadow: 0 0 0 5px rgba(255,255,255,0); }
+  }
+
+  /* ── 상태 도트 (Light) — 검은색 ── */
+  .dot-active-light   { width: 7px; height: 7px; border-radius: 50%; background: #000000; display: inline-block; flex-shrink: 0; }
+  .dot-success-light  { width: 7px; height: 7px; border-radius: 50%; background: #000000; display: inline-block; flex-shrink: 0; }
+  .dot-warning-light  { width: 7px; height: 7px; border-radius: 50%; background: rgba(0,0,0,0.60); display: inline-block; flex-shrink: 0; }
+  .dot-danger-light   { width: 7px; height: 7px; border-radius: 50%; background: rgba(0,0,0,0.40); display: inline-block; flex-shrink: 0; }
+  .dot-neutral-light  { width: 7px; height: 7px; border-radius: 50%; background: rgba(0,0,0,0.30); display: inline-block; flex-shrink: 0; }
+  .dot-pulse-light { animation: dot-pulse-anim-light 1.8s ease-in-out infinite; }
+  @keyframes dot-pulse-anim-light {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,0,0,0.50); }
+    50%       { opacity: 0.80; box-shadow: 0 0 0 5px rgba(0,0,0,0); }
+  }
+
+  /* ── 배경 입자 (제거됨 - 순백색 배경) ── */
+  .particle-bg { position: relative; overflow: hidden; }
+
+  /* ── 구분선 (Dark) ── */
+  .divider { border: none; border-top: 1px solid rgba(255,255,255,0.10); }
+
+  /* ── 구분선 (Light) ── */
+  .divider-light { border: none; border-top: 1px solid rgba(0,0,0,0.10); }
+
+  /* ── 상단 네온 라인 (제거됨 - 순백색 테마) ── */
+  .card-top-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  /* ── 배지 시스템 (Dark) — 순백색 ── */
+  .stat-badge-cyan    { background: rgba(255,255,255,0.10);  border: 1px solid rgba(255,255,255,0.20);  color: #ffffff; }
+  .stat-badge-indigo  { background: rgba(255,255,255,0.10);  border: 1px solid rgba(255,255,255,0.20);  color: #ffffff; }
+  .stat-badge-violet  { background: rgba(255,255,255,0.10);  border: 1px solid rgba(255,255,255,0.20);  color: #ffffff; }
+  .stat-badge-emerald { background: rgba(255,255,255,0.10);  border: 1px solid rgba(255,255,255,0.20);  color: #ffffff; }
+  .stat-badge-rose    { background: rgba(255,255,255,0.10);  border: 1px solid rgba(255,255,255,0.20);  color: #ffffff; }
+  .stat-badge-amber   { background: rgba(255,255,255,0.10);  border: 1px solid rgba(255,255,255,0.20);  color: #ffffff; }
+
+  /* ── 배지 시스템 (Light) — 검은색 ── */
+  .stat-badge-cyan-light    { background: rgba(0,0,0,0.06);  border: 1px solid rgba(0,0,0,0.12);  color: #000000; }
+  .stat-badge-indigo-light  { background: rgba(0,0,0,0.06);  border: 1px solid rgba(0,0,0,0.12);  color: #000000; }
+  .stat-badge-violet-light  { background: rgba(0,0,0,0.06);  border: 1px solid rgba(0,0,0,0.12);  color: #000000; }
+  .stat-badge-emerald-light { background: rgba(0,0,0,0.06);  border: 1px solid rgba(0,0,0,0.12);  color: #000000; }
+  .stat-badge-rose-light    { background: rgba(0,0,0,0.06);  border: 1px solid rgba(0,0,0,0.12);  color: #000000; }
+  .stat-badge-amber-light   { background: rgba(0,0,0,0.06);  border: 1px solid rgba(0,0,0,0.12);  color: #000000; }
+
+  /* ── 섹션 헤더 레이블 (Dark) ── */
+  .section-label {
+    font-size: 0.65rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.50);
+  }
+
+  /* ── 섹션 헤더 레이블 (Light) ── */
+  .section-label-light {
+    font-size: 0.65rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.50);
+  }
+
+  /* ── 수치 강조 텍스트 (Dark) ── */
+  .metric-value {
+    font-size: 2.75rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+  .metric-value-lg {
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: #ffffff;
+  }
+
+  /* ── 수치 강조 텍스트 (Light) ── */
+  .metric-value-light {
+    font-size: 2.75rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: #000000;
+  }
+  .metric-value-light-lg {
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: #000000;
+  }
+
+  /* ── 추세 화살표 (Dark) ── */
+  .trend-up   { color: #ffffff; }
+  .trend-down { color: rgba(255,255,255,0.60); }
+  .trend-flat { color: rgba(255,255,255,0.40); }
+
+  /* ── 추세 화살표 (Light) ── */
+  .trend-up-light   { color: #000000; }
+  .trend-down-light { color: rgba(0,0,0,0.60); }
+  .trend-flat-light { color: rgba(0,0,0,0.40); }
+}

@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "profiles": {
+      "title": "Profile",
+      "description": "User profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "full_name": { "type": "string" },
+        "univ_name": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN", "USER"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "clubs": {
+      "title": "Club",
+      "description": "Club information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "logo_url": { "type": "string" },
+        "description": { "type": "string" },
+        "admin_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "admin_id"]
+    },
+    "schedules": {
+      "title": "Schedule",
+      "description": "Club schedules",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "club_id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["GENERAL", "ASSIGNMENT"] },
+        "qr_code_token": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "club_id", "title", "date", "type"]
+    },
+    "attendance": {
+      "title": "Attendance",
+      "description": "Attendance records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schedule_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["PRESENT", "ABSENT"] },
+        "marked_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "schedule_id", "user_id", "status"]
+    },
+    "submissions": {
+      "title": "Submission",
+      "description": "Assignment submissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schedule_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "file_url": { "type": "string" },
+        "content": { "type": "string" },
+        "submitted_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "schedule_id", "user_id"]
+    },
+    "activity_logs": {
+      "title": "Activity Log",
+      "description": "Personal activity logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "image_url": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "title"]
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": { "schema": "profiles", "description": "User profiles" },
+    "/clubs/{clubId}": { "schema": "clubs", "description": "Clubs" },
+    "/schedules/{scheduleId}": { "schema": "schedules", "description": "Schedules" },
+    "/attendance/{attendanceId}": { "schema": "attendance", "description": "Attendance" },
+    "/submissions/{submissionId}": { "schema": "submissions", "description": "Submissions" },
+    "/activity_logs/{logId}": { "schema": "activity_logs", "description": "Activity Logs" }
+  }
+}

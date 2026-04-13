@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>Club DX — 플로우차트 (Figma용)</title>
+<style>
+  body { margin: 0; background: #f0f0f0; font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; }
+  .toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: #222; color: #fff; padding: 10px 20px;
+    display: flex; align-items: center; gap: 16px; font-size: 13px;
+  }
+  .toolbar strong { font-size: 15px; }
+  .toolbar button {
+    background: #444; border: none; color: #fff; padding: 6px 14px;
+    border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  .toolbar button:hover { background: #666; }
+  .tip { color: #aaa; font-size: 11px; }
+  .canvas { padding-top: 52px; overflow: auto; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <strong>Club DX 플로우차트</strong>
+  <span class="tip">SVG를 복사해서 Figma에 붙여넣기 하거나, 파일 저장 후 Figma → Import 하세요</span>
+  <button onclick="downloadSVG()">SVG 다운로드</button>
+  <button onclick="copySVG()">SVG 복사</button>
+</div>
+<div class="canvas">
+<svg id="main-svg" xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 1600 2100" width="1600" height="2100"
+  font-family="'Apple SD Gothic Neo', -apple-system, sans-serif">
+
+<defs>
+  <!-- arrowheads -->
+  <marker id="ah"      markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#333"/></marker>
+  <marker id="ah-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#1565c0"/></marker>
+  <marker id="ah-red"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#c62828"/></marker>
+  <marker id="ah-grn"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2e7d32"/></marker>
+  <marker id="ah-ylw"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f57f17"/></marker>
+  <marker id="ah-pnk"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#e91e63"/></marker>
+  <marker id="ah-pur"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#6a1b9a"/></marker>
+  <marker id="ah-cyn"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#00838f"/></marker>
+  <marker id="ah-org"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#e65100"/></marker>
+  <marker id="ah-brn"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4e342e"/></marker>
+</defs>
+
+<!-- ══════════════════════════════════════════════════════
+     SECTION BACKGROUNDS
+══════════════════════════════════════════════════════ -->
+
+<!-- 파란색: 로그인/인증 섹션 -->
+<rect x="12" y="12" width="860" height="470" rx="14" fill="#e0f7fa" stroke="#00bcd4" stroke-width="4"/>
+<text x="34" y="40" font-size="14" font-weight="bold" fill="#006064">시작화면</text>
+<text x="370" y="40" font-size="14" font-weight="bold" fill="#006064">로그인 화면</text>
+
+<!-- 초록색: 동아리/Admin 관리 섹션 (오른쪽) -->
+<rect x="890" y="12" width="698" height="1800" rx="14" fill="#e8f5e9" stroke="#4caf50" stroke-width="4"/>
+<text x="912" y="40" font-size="14" font-weight="bold" fill="#1b5e20">동아리 프로필</text>
+<text x="1200" y="40" font-size="14" font-weight="bold" fill="#1b5e20">동아리 프로필 수정</text>
+
+<!-- 노란색: 동아리 상세/신청 섹션 -->
+<rect x="12" y="492" width="380" height="330" rx="14" fill="#fffde7" stroke="#f9a825" stroke-width="3"/>
+
+<!-- 핑크 굵은 테두리: user 페이지 전체 영역 -->
+<rect x="196" y="492" width="680" height="990" rx="14" fill="none" stroke="#e91e63" stroke-width="8"/>
+
+<!-- ══════════════════════════════════════════════════════
+     NODES — LOGIN SECTION (파란색)
+══════════════════════════════════════════════════════ -->
+
+<!-- 시작화면 -->
+<rect x="30" y="60" width="140" height="120" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="100" y="125" text-anchor="middle" font-size="13" fill="#111">시작화면</text>
+
+<!-- 회원가입 여부 (diamond) -->
+<polygon points="240,90 305,128 240,166 175,128" fill="#fafafa" stroke="#444" stroke-width="1.5"/>
+<text x="240" y="124" text-anchor="middle" font-size="11" fill="#111">회원가입</text>
+<text x="240" y="138" text-anchor="middle" font-size="11" fill="#111">여부</text>
+
+<!-- 로그인 화면 -->
+<rect x="340" y="60" width="160" height="120" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="420" y="125" text-anchor="middle" font-size="13" fill="#111">로그인 화면</text>
+
+<!-- 동아리 소속 여부 (diamond) -->
+<polygon points="574,90 640,128 574,166 508,128" fill="#fafafa" stroke="#444" stroke-width="1.5"/>
+<text x="574" y="124" text-anchor="middle" font-size="11" fill="#111">동아리 소속</text>
+<text x="574" y="138" text-anchor="middle" font-size="11" fill="#111">여부</text>
+
+<!-- 동아리 운영진 여부 (diamond) -->
+<polygon points="780,90 846,128 780,166 714,128" fill="#fafafa" stroke="#444" stroke-width="1.5"/>
+<text x="780" y="124" text-anchor="middle" font-size="11" fill="#111">동아리</text>
+<text x="780" y="138" text-anchor="middle" font-size="11" fill="#111">운영진 여부</text>
+
+<!-- 회원가입 화면 -->
+<rect x="160" y="270" width="160" height="120" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="240" y="335" text-anchor="middle" font-size="13" fill="#111">회원가입 화면</text>
+
+<!-- 첫 랜딩 페이지(무소속) -->
+<rect x="440" y="250" width="200" height="185" rx="4" fill="#e8e8e8" stroke="#444" stroke-width="1.5"/>
+<text x="540" y="278" text-anchor="middle" font-size="12" font-weight="bold" fill="#111">첫 랜딩 페이지(무소속)</text>
+<rect x="458" y="288" width="160" height="38" rx="4" fill="#c8e6c9" stroke="#388e3c" stroke-width="1.5"/>
+<text x="538" y="311" text-anchor="middle" font-size="12" fill="#111">동아리 만들기</text>
+<rect x="458" y="336" width="160" height="38" rx="4" fill="#fff9c4" stroke="#f9a825" stroke-width="1.5"/>
+<text x="538" y="359" text-anchor="middle" font-size="12" fill="#111">동아리 찾기</text>
+
+<!-- 동아리 생성 -->
+<rect x="700" y="260" width="150" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="775" y="315" text-anchor="middle" font-size="13" fill="#111">동아리 생성</text>
+
+<!-- 동아리 생성 완료 -->
+<rect x="700" y="395" width="150" height="80" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="775" y="440" text-anchor="middle" font-size="13" fill="#111">동아리 생성 완료</text>
+
+<!-- ══════════════════════════════════════════════════════
+     NODES — 동아리 상세 (노란색)
+══════════════════════════════════════════════════════ -->
+
+<!-- 동아리 목록 -->
+<rect x="228" y="512" width="150" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="303" y="567" text-anchor="middle" font-size="13" fill="#111">동아리 목록</text>
+
+<!-- 동아리 상세 페이지 -->
+<rect x="22" y="512" width="155" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="100" y="558" text-anchor="middle" font-size="12" fill="#111">동아리 상세</text>
+<text x="100" y="574" text-anchor="middle" font-size="12" fill="#111">페이지</text>
+
+<!-- 랜딩페이지(승인대기) -->
+<rect x="22" y="650" width="165" height="100" rx="4" fill="#d7ccc8" stroke="#795548" stroke-width="1.5"/>
+<text x="104" y="696" text-anchor="middle" font-size="12" fill="#111">랜딩페이지</text>
+<text x="104" y="712" text-anchor="middle" font-size="12" fill="#111">(승인대기)</text>
+
+<!-- 동아리 승인 여부 (diamond) -->
+<polygon points="290,695 352,730 290,765 228,730" fill="#fafafa" stroke="#444" stroke-width="1.5"/>
+<text x="290" y="726" text-anchor="middle" font-size="11" fill="#111">동아리</text>
+<text x="290" y="740" text-anchor="middle" font-size="11" fill="#111">승인 여부</text>
+
+<!-- ══════════════════════════════════════════════════════
+     NODES — USER 페이지 (핑크 영역)
+══════════════════════════════════════════════════════ -->
+
+<!-- user 페이지 (탭 포함) -->
+<rect x="215" y="660" width="230" height="215" rx="4" fill="#ececec" stroke="#444" stroke-width="1.5"/>
+<text x="330" y="684" text-anchor="middle" font-size="13" font-weight="bold" fill="#111">user 페이지</text>
+<rect x="228" y="692" width="74" height="28" rx="4" fill="#f8bbd0" stroke="#e91e63" stroke-width="1.5"/>
+<text x="265" y="710" text-anchor="middle" font-size="11" fill="#111">프로필</text>
+<rect x="312" y="692" width="56" height="28" rx="4" fill="#ffe0b2" stroke="#ff9800" stroke-width="1.5"/>
+<text x="340" y="710" text-anchor="middle" font-size="11" fill="#111">토근</text>
+<rect x="228" y="728" width="128" height="28" rx="4" fill="#fce4ec" stroke="#f06292" stroke-width="1.5"/>
+<text x="292" y="746" text-anchor="middle" font-size="11" fill="#111">QR출석하기</text>
+<rect x="228" y="764" width="128" height="28" rx="4" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+<text x="292" y="782" text-anchor="middle" font-size="11" fill="#111">3주간 일정</text>
+<rect x="228" y="800" width="128" height="28" rx="4" fill="#fff9c4" stroke="#f9a825" stroke-width="1.5"/>
+<text x="292" y="818" text-anchor="middle" font-size="11" fill="#111">동아리 찾기</text>
+
+<!-- 프로필 수정 -->
+<rect x="490" y="680" width="155" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="568" y="735" text-anchor="middle" font-size="13" fill="#111">프로필 수정</text>
+
+<!-- 프로필 (기본정보 + 활동이력) -->
+<rect x="690" y="660" width="175" height="150" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="778" y="684" text-anchor="middle" font-size="13" fill="#111">프로필</text>
+<rect x="704" y="694" width="148" height="38" rx="4" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+<text x="778" y="717" text-anchor="middle" font-size="11" fill="#555">기본정보</text>
+<rect x="704" y="740" width="148" height="38" rx="4" fill="#bbdefb" stroke="#1565c0" stroke-width="1.5"/>
+<text x="778" y="763" text-anchor="middle" font-size="11" fill="#111">활동이력</text>
+
+<!-- 동아리(과거) 페이지 -->
+<rect x="400" y="870" width="195" height="130" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="497" y="893" text-anchor="middle" font-size="12" fill="#111">동아리(과거) 페이지</text>
+<rect x="414" y="904" width="163" height="60" rx="4" fill="#ffe0b2" stroke="#e65100" stroke-width="1.5"/>
+<text x="495" y="939" text-anchor="middle" font-size="12" fill="#111">활동목록</text>
+
+<!-- 활동 상세 페이지(과거) -->
+<rect x="208" y="870" width="165" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="291" y="913" text-anchor="middle" font-size="12" fill="#111">활동 상세 페이지</text>
+<text x="291" y="929" text-anchor="middle" font-size="12" fill="#111">(과거)</text>
+
+<!-- 출석 QR (user 스캐너) -->
+<rect x="655" y="860" width="140" height="150" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="725" y="884" text-anchor="middle" font-size="12" fill="#111">출석 QR</text>
+<rect x="673" y="896" width="20" height="20" fill="none" stroke="#444" stroke-width="2.5"/>
+<rect x="703" y="896" width="20" height="20" fill="none" stroke="#444" stroke-width="2.5"/>
+<rect x="673" y="926" width="20" height="20" fill="none" stroke="#444" stroke-width="2.5"/>
+<rect x="703" y="926" width="20" height="20" fill="none" stroke="#444" stroke-width="2.5"/>
+
+<!-- 출석 성공 실패 재시도 -->
+<rect x="490" y="1060" width="195" height="90" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="587" y="1100" text-anchor="middle" font-size="12" fill="#111">출석 성공</text>
+<text x="587" y="1116" text-anchor="middle" font-size="12" fill="#111">실패 재시도</text>
+
+<!-- 활동 상세 페이지 -->
+<rect x="208" y="1060" width="165" height="90" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="291" y="1109" text-anchor="middle" font-size="12" fill="#111">활동 상세 페이지</text>
+
+<!-- 3주간 일정 (캘린더+탭) -->
+<rect x="655" y="1040" width="165" height="165" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="738" y="1064" text-anchor="middle" font-size="12" font-weight="bold" fill="#111">3주간 일정</text>
+<rect x="669" y="1074" width="136" height="40" rx="4" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+<text x="737" y="1098" text-anchor="middle" font-size="12" fill="#555">캘린더</text>
+<rect x="669" y="1122" width="136" height="28" rx="4" fill="#ffe0b2" stroke="#ff9800" stroke-width="1.5"/>
+<text x="737" y="1140" text-anchor="middle" font-size="11" fill="#111">활동 일정</text>
+<rect x="669" y="1158" width="136" height="28" rx="4" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+<text x="737" y="1176" text-anchor="middle" font-size="11" fill="#111">과제 일정</text>
+
+<!-- 과제 페이지 -->
+<rect x="400" y="1060" width="180" height="130" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="490" y="1083" text-anchor="middle" font-size="12" fill="#111">과제 페이지</text>
+<rect x="414" y="1096" width="152" height="38" rx="4" fill="#f8bbd0" stroke="#e91e63" stroke-width="1.5"/>
+<text x="490" y="1119" text-anchor="middle" font-size="12" fill="#111">과제제출하기</text>
+
+<!-- 과제 제출 완료 팝업 -->
+<rect x="208" y="1230" width="165" height="90" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="291" y="1271" text-anchor="middle" font-size="12" fill="#111">과제 제출 완료</text>
+<text x="291" y="1287" text-anchor="middle" font-size="12" fill="#111">팝업</text>
+
+<!-- ══════════════════════════════════════════════════════
+     NODES — ADMIN / 동아리 관리 (초록 영역)
+══════════════════════════════════════════════════════ -->
+
+<!-- 동아리 프로필 -->
+<rect x="1000" y="58" width="165" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1083" y="113" text-anchor="middle" font-size="13" fill="#111">동아리 프로필</text>
+
+<!-- 동아리 프로필 수정 -->
+<rect x="1240" y="58" width="180" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1330" y="113" text-anchor="middle" font-size="13" fill="#111">동아리 프로필 수정</text>
+
+<!-- admin 페이지 (탭+버튼) -->
+<rect x="900" y="355" width="240" height="275" rx="4" fill="#ececec" stroke="#444" stroke-width="1.5"/>
+<text x="1020" y="380" text-anchor="middle" font-size="13" font-weight="bold" fill="#111">admin 페이지</text>
+<rect x="914" y="390" width="68" height="28" rx="4" fill="#f8bbd0" stroke="#e91e63" stroke-width="1.5"/>
+<text x="948" y="408" text-anchor="middle" font-size="11" fill="#111">프로필</text>
+<rect x="992" y="390" width="56" height="28" rx="4" fill="#ffe0b2" stroke="#ff9800" stroke-width="1.5"/>
+<text x="1020" y="408" text-anchor="middle" font-size="11" fill="#111">토근</text>
+<rect x="914" y="428" width="90" height="24" rx="3" fill="#ffccbc" stroke="#e64a19" stroke-width="1"/>
+<text x="959" y="444" text-anchor="middle" font-size="10" fill="#111">최원수</text>
+<rect x="1014" y="428" width="112" height="24" rx="3" fill="#ffccbc" stroke="#e64a19" stroke-width="1"/>
+<text x="1070" y="444" text-anchor="middle" font-size="10" fill="#111">최근출석 클릭</text>
+<rect x="914" y="462" width="212" height="30" rx="3" fill="#ffcdd2" stroke="#c62828" stroke-width="1.5"/>
+<text x="1020" y="481" text-anchor="middle" font-size="11" fill="#111">출석 QR 생성</text>
+<rect x="914" y="500" width="212" height="30" rx="3" fill="#fff9c4" stroke="#f57f17" stroke-width="1.5"/>
+<text x="1020" y="519" text-anchor="middle" font-size="11" fill="#111">일정/과제 생성</text>
+<!-- 최근 과제 현황 클릭 (작은 버튼) -->
+<rect x="914" y="540" width="212" height="24" rx="3" fill="#ffccbc" stroke="#e64a19" stroke-width="1"/>
+<text x="1020" y="556" text-anchor="middle" font-size="10" fill="#111">최근 과제 현황 클릭</text>
+<!-- 출석/QR생성, 일정/과제생성 (세로 라벨) - represented by the buttons above -->
+
+<!-- 동아리 회원관리(삭제) — 회원목록 포함 -->
+<rect x="1000" y="218" width="200" height="160" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1100" y="242" text-anchor="middle" font-size="12" fill="#111">동아리 회원관리(삭제)</text>
+<text x="1050" y="260" text-anchor="middle" font-size="11" fill="#555">신청자</text>
+<rect x="1020" y="268" width="158" height="88" rx="4" fill="#b3e5fc" stroke="#0288d1" stroke-width="1.5"/>
+<text x="1099" y="317" text-anchor="middle" font-size="13" fill="#111">회원목록</text>
+
+<!-- 신청자 정보 및 수락 팝업 -->
+<rect x="1240" y="218" width="185" height="85" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1333" y="253" text-anchor="middle" font-size="11" fill="#111">신청자 정보 및</text>
+<text x="1333" y="269" text-anchor="middle" font-size="11" fill="#111">수락 팝업</text>
+
+<!-- 신청자 확인 (화살표 레이블) -->
+<!-- 회원 선택 (화살표 레이블) -->
+
+<!-- 동아리 출석관리(변경) -->
+<rect x="1000" y="470" width="200" height="130" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1100" y="495" text-anchor="middle" font-size="12" fill="#111">동아리 출석관리(변경)</text>
+
+<!-- 회원 상세 정보(팝업) -->
+<rect x="1240" y="445" width="185" height="110" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1333" y="495" text-anchor="middle" font-size="12" fill="#111">회원 상세 정보</text>
+<text x="1333" y="511" text-anchor="middle" font-size="12" fill="#111">(팝업)</text>
+
+<!-- 동아리 과제관리 -->
+<rect x="1000" y="648" width="200" height="145" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1100" y="672" text-anchor="middle" font-size="12" fill="#111">동아리 과제관리</text>
+<rect x="1015" y="684" width="130" height="38" rx="4" fill="#bbdefb" stroke="#1565c0" stroke-width="1.5"/>
+<text x="1080" y="707" text-anchor="middle" font-size="12" fill="#111">과제 정보</text>
+
+<!-- 출석 QR 생성 (admin) -->
+<rect x="1000" y="858" width="165" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1083" y="913" text-anchor="middle" font-size="13" fill="#111">출석 QR 생성</text>
+
+<!-- 출석 최종결과 팝업 -->
+<rect x="1240" y="858" width="185" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1333" y="903" text-anchor="middle" font-size="12" fill="#111">출석 최종결과 팝업</text>
+
+<!-- 일정/과제 캘린더 -->
+<rect x="1000" y="1020" width="200" height="180" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1100" y="1044" text-anchor="middle" font-size="12" fill="#111">일정/과제 캘린더</text>
+<rect x="1015" y="1054" width="168" height="70" rx="4" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+<text x="1099" y="1093" text-anchor="middle" font-size="13" fill="#555">캘린더</text>
+<rect x="1015" y="1132" width="168" height="32" rx="4" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5"/>
+<text x="1099" y="1152" text-anchor="middle" font-size="11" fill="#111">모두/일정/과제</text>
+
+<!-- 일정 목록 관리 -->
+<rect x="1240" y="1020" width="175" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1328" y="1075" text-anchor="middle" font-size="13" fill="#111">일정 목록 관리</text>
+
+<!-- 과제 상세 페이지 (admin) -->
+<rect x="1000" y="1280" width="175" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1088" y="1335" text-anchor="middle" font-size="13" fill="#111">과제 상세 페이지</text>
+
+<!-- 일정상세 페이지 -->
+<rect x="1240" y="1215" width="175" height="100" rx="4" fill="#e0e0e0" stroke="#444" stroke-width="1.5"/>
+<text x="1328" y="1269" text-anchor="middle" font-size="13" fill="#111">일정상세 페이지</text>
+
+<!-- ══════════════════════════════════════════════════════
+     ARROWS — LOGIN SECTION
+══════════════════════════════════════════════════════ -->
+
+<!-- 시작화면 → 회원가입여부 -->
+<line x1="170" y1="120" x2="175" y2="122" stroke="#444" stroke-width="1.5" marker-end="url(#ah)"/>
+
+<!-- 회원가입여부 YES (파랑) → 로그인화면 -->
+<line x1="305" y1="128" x2="340" y2="115" stroke="#1565c0" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+<text x="316" y="112" font-size="11" fill="#1565c0">예</text>
+
+<!-- 회원가입여부 NO (빨강) → 회원가입화면 -->
+<path d="M240,166 L240,270" stroke="#c62828" stroke-width="1.5" fill="none" marker-end="url(#ah-red)"/>
+<text x="245" y="225" font-size="11" fill="#c62828">아니오</text>
+
+<!-- 로그인화면 → 동아리소속여부 (파랑) -->
+<line x1="500" y1="120" x2="508" y2="123" stroke="#1565c0" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+
+<!-- 동아리소속여부 YES (파랑) → 동아리운영진여부 -->
+<line x1="640" y1="128" x2="714" y2="124" stroke="#1565c0" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+<text x="656" y="119" font-size="11" fill="#1565c0">예</text>
+
+<!-- 동아리소속여부 NO (빨강) → 첫랜딩페이지 -->
+<path d="M574,166 L574,238 L540,238 L540,250" stroke="#c62828" stroke-width="1.5" fill="none" marker-end="url(#ah-red)"/>
+<text x="578" y="215" font-size="11" fill="#c62828">아니오</text>
+
+<!-- 동아리운영진여부 YES → admin 페이지 (파랑) -->
+<path d="M846,128 L870,128 L870,490 L1020,490" stroke="#1565c0" stroke-width="1.5" fill="none" marker-end="url(#ah-blue)"/>
+<text x="849" y="120" font-size="11" fill="#1565c0">예</text>
+
+<!-- 동아리운영진여부 NO (빨강) → user 페이지 -->
+<path d="M780,166 L780,225 L330,225 L330,660" stroke="#c62828" stroke-width="1.5" fill="none" marker-end="url(#ah-red)"/>
+<text x="784" y="200" font-size="11" fill="#c62828">아니오</text>
+
+<!-- 회원가입화면 → 로그인화면 (검정, 위로) -->
+<path d="M240,390 L240,458 L420,458 L420,180" stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+<text x="320" y="470" font-size="11" fill="#333">회원가입 완료</text>
+
+<!-- 첫랜딩페이지 동아리만들기 → 동아리생성 (초록) -->
+<line x1="618" y1="305" x2="700" y2="300" stroke="#2e7d32" stroke-width="1.5" marker-end="url(#ah-grn)"/>
+<text x="622" y="297" font-size="11" fill="#2e7d32">동아리 만들기</text>
+
+<!-- 동아리생성 → 동아리생성완료 -->
+<line x1="775" y1="360" x2="775" y2="395" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+
+<!-- 동아리생성완료 → admin 페이지 -->
+<path d="M775,475 L775,510 L1020,510" stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+<text x="795" y="497" font-size="11" fill="#333">동아리 생성 완료</text>
+
+<!-- 첫랜딩페이지 동아리찾기 → 동아리목록 (노랑) -->
+<path d="M538,435 L538,500 L378,500 L378,512" stroke="#f57f17" stroke-width="1.5" fill="none" marker-end="url(#ah-ylw)"/>
+<text x="430" y="494" font-size="11" fill="#f57f17">동아리 찾기</text>
+
+<!-- ══════════════════════════════════════════════════════
+     ARROWS — 동아리 상세 섹션
+══════════════════════════════════════════════════════ -->
+
+<!-- 동아리목록 → 동아리상세페이지 -->
+<line x1="228" y1="562" x2="177" y2="562" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="185" y="555" font-size="11" fill="#333">동아리 선택</text>
+
+<!-- 동아리상세페이지 → 랜딩페이지(승인대기) -->
+<line x1="100" y1="612" x2="100" y2="650" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="105" y="637" font-size="11" fill="#333">동아리 신청</text>
+
+<!-- 랜딩페이지(승인대기) → 동아리승인여부 -->
+<line x1="187" y1="700" x2="228" y2="720" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+
+<!-- 동아리승인여부 YES (노랑) → user 페이지 -->
+<path d="M352,730 L445,730 L330,730 L330,875" stroke="#f57f17" stroke-width="1.5" fill="none" marker-end="url(#ah-ylw)"/>
+<text x="356" y="723" font-size="11" fill="#f57f17">예</text>
+<!-- fix: direct path -->
+<path d="M352,730 L445,730" stroke="#f57f17" stroke-width="1.5" fill="none"/>
+<path d="M330,730 L330,660" stroke="#f57f17" stroke-width="1.5" fill="none" marker-end="url(#ah-ylw)"/>
+<line x1="352" y1="730" x2="330" y2="730" stroke="#f57f17" stroke-width="1.5"/>
+
+<!-- 동아리승인여부 NO (빨강) → 동아리찾기(user 탭) -->
+<path d="M290,765 L290,810 L292,810" stroke="#c62828" stroke-width="1.5" fill="none" marker-end="url(#ah-red)"/>
+<text x="250" y="795" font-size="11" fill="#c62828">아니오</text>
+
+<!-- ══════════════════════════════════════════════════════
+     ARROWS — USER 페이지 내부
+══════════════════════════════════════════════════════ -->
+
+<!-- user 페이지 → 프로필수정 (프로필 클릭) -->
+<line x1="445" y1="703" x2="490" y2="715" stroke="#6a1b9a" stroke-width="1.5" marker-end="url(#ah-pur)"/>
+<text x="448" y="698" font-size="11" fill="#6a1b9a">프로필 클릭</text>
+
+<!-- user 페이지 → 프로필 (프로필탭) -->
+<line x1="445" y1="706" x2="690" y2="706" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+
+<!-- 프로필 활동이력 → 동아리(과거)페이지 -->
+<path d="M778,778 L778,835 L595,835 L595,870" stroke="#1565c0" stroke-width="1.5" fill="none" marker-end="url(#ah-blue)"/>
+<text x="598" y="830" font-size="11" fill="#1565c0">활동이력 (동아리 선택)</text>
+
+<!-- 동아리(과거)페이지 활동목록 → 활동상세페이지(과거) -->
+<line x1="400" y1="930" x2="373" y2="918" stroke="#4e342e" stroke-width="1.5" marker-end="url(#ah-brn)"/>
+
+<!-- user 페이지 QR출석하기 → 출석QR -->
+<path d="M356,742 L725,742 L725,860" stroke="#e91e63" stroke-width="1.5" fill="none" marker-end="url(#ah-pnk)"/>
+<text x="500" y="736" font-size="11" fill="#e91e63">QR출석하기</text>
+
+<!-- 출석QR → 출석성공실패재시도 -->
+<line x1="725" y1="1010" x2="685" y2="1060" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+
+<!-- user 페이지 3주간일정 → 3주간일정 화면 -->
+<path d="M356,778 L738,778 L738,1040" stroke="#5c6bc0" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+
+<!-- user 페이지 프로필클릭 → 과제페이지 (노랑 아래) -->
+<path d="M330,875 L330,1000 L400,1000 L400,1060" stroke="#f57f17" stroke-width="1.5" fill="none" marker-end="url(#ah-ylw)"/>
+
+<!-- 과제페이지 과제제출하기 → 과제제출완료팝업 (핑크) -->
+<path d="M400,1134 L291,1134 L291,1230" stroke="#e91e63" stroke-width="1.5" fill="none" marker-end="url(#ah-pnk)"/>
+
+<!-- 과제제출완료팝업 → 활동상세페이지 (노랑 위) -->
+<path d="M291,1230 L291,1150" stroke="#f57f17" stroke-width="1.5" fill="none" marker-end="url(#ah-ylw)"/>
+
+<!-- 토근전환 이동(운영진만) — user → admin (검정 점선) -->
+<path d="M445,693 L900,475" stroke="#555" stroke-width="1.5" stroke-dasharray="7,4" fill="none" marker-end="url(#ah)"/>
+<text x="560" y="580" font-size="11" fill="#555" transform="rotate(-17,560,580)">토근전환 이동(운영진만)</text>
+
+<!-- 토근전환 이동(운영진만) — admin → user (검정 점선) -->
+<path d="M900,540 L445,740" stroke="#555" stroke-width="1.5" stroke-dasharray="7,4" fill="none" marker-end="url(#ah)"/>
+
+<!-- 3주간 일정 상세보기 → 일정/과제캘린더(admin) -->
+<path d="M820,1070 L870,1070 L870,1110 L1000,1110" stroke="#555" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#ah)"/>
+<text x="828" y="1063" font-size="11" fill="#555">3주간 일정 상세보기</text>
+
+<!-- ══════════════════════════════════════════════════════
+     ARROWS — ADMIN / 동아리 관리
+══════════════════════════════════════════════════════ -->
+
+<!-- admin → 동아리프로필 (프로필이동, 보라) -->
+<path d="M1020,355 L1020,220 L1083,220 L1083,158" stroke="#6a1b9a" stroke-width="1.5" fill="none" marker-end="url(#ah-pur)"/>
+<text x="1028" y="300" font-size="11" fill="#6a1b9a">프로필 이동</text>
+
+<!-- 동아리프로필 → 동아리프로필수정 -->
+<line x1="1165" y1="108" x2="1240" y2="108" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="1170" y="101" font-size="11" fill="#333">동아리 프로필 수정</text>
+
+<!-- admin 회원수클릭 → 동아리회원관리 -->
+<path d="M959,428 L959,370 L1000,370 L1000,300 L1000,378" stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+<!-- simpler: -->
+<path d="M980,428 L980,300 L1000,300" stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+<text x="984" y="380" font-size="10" fill="#333">회원수 클릭</text>
+
+<!-- admin 최근출석클릭 → 동아리출석관리 -->
+<path d="M1070,428 L1070,470" stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+<text x="1075" y="455" font-size="10" fill="#333">최근출석 클릭</text>
+
+<!-- admin 출석QR생성 → 출석QR생성(화면) -->
+<path d="M1020,462 L1020,440 L1083,440 L1083,858" stroke="#c62828" stroke-width="1.5" fill="none" marker-end="url(#ah-red)"/>
+<text x="1028" y="748" font-size="10" fill="#c62828" writing-mode="tb">출석 QR 생성</text>
+
+<!-- admin 일정과제생성 → 일정/과제캘린더 -->
+<path d="M1126,500 L1150,500 L1150,820 L1100,820 L1100,1020" stroke="#f57f17" stroke-width="1.5" fill="none" marker-end="url(#ah-ylw)"/>
+<text x="1155" y="760" font-size="10" fill="#f57f17" writing-mode="tb">일정/과제 생성</text>
+
+<!-- admin 최근과제현황클릭 → 동아리과제관리 -->
+<path d="M1070,540 L1070,600 L1100,600 L1100,648" stroke="#e65100" stroke-width="1.5" fill="none" marker-end="url(#ah-org)"/>
+<text x="1075" y="597" font-size="10" fill="#e65100">최근 과제 현황 클릭</text>
+
+<!-- 동아리회원관리 신청자 → 신청자정보팝업 -->
+<line x1="1200" y1="240" x2="1240" y2="248" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="1205" y="235" font-size="11" fill="#333">신청자 확인</text>
+
+<!-- 동아리회원관리 회원선택 → 회원상세정보팝업 (시안색) -->
+<path d="M1199" y1="310" x2="1240,310 L1240,490" stroke="#00838f" stroke-width="1.5" fill="none" marker-end="url(#ah-cyn)"/>
+<text x="1204" y="305" font-size="11" fill="#00838f">회원 선택</text>
+<!-- fix syntax -->
+<path d="M1200,310 L1240,310 L1240,445" stroke="#00838f" stroke-width="1.5" fill="none" marker-end="url(#ah-cyn)"/>
+<text x="1205" y="350" font-size="11" fill="#00838f">회원 선택</text>
+
+<!-- 동아리출석관리 회원선택출결포커싱 → 회원상세정보팝업 -->
+<line x1="1200" y1="500" x2="1240" y2="495" stroke="#00838f" stroke-width="1.5" marker-end="url(#ah-cyn)"/>
+<text x="1200" y="493" font-size="10" fill="#00838f">회원선택 출결 포커싱</text>
+
+<!-- 동아리과제관리 회원선택+과제제출현황포커싱 → 회원상세정보팝업 -->
+<path d="M1200,700 L1260,700 L1260,555" stroke="#00838f" stroke-width="1.5" fill="none" marker-end="url(#ah-cyn)"/>
+<text x="1205" y="696" font-size="10" fill="#00838f">회원 선택</text>
+<text x="1205" y="710" font-size="10" fill="#00838f">과제제출 현황 포커싱</text>
+
+<!-- 동아리과제관리 과제정보클릭 → 과제상세페이지 -->
+<path d="M1100,793 L1100,840 L1088,840 L1088,1280" stroke="#1565c0" stroke-width="1.5" fill="none" marker-end="url(#ah-blue)"/>
+<text x="1105" y="838" font-size="11" fill="#1565c0">과제정보 클릭</text>
+
+<!-- 출석QR생성 → 출석최종결과팝업 -->
+<line x1="1165" y1="908" x2="1240" y2="908" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+
+<!-- 일정/과제캘린더 → 일정목록관리 (핑크, 토근 일정 더 보기) -->
+<line x1="1200" y1="1060" x2="1240" y2="1060" stroke="#e91e63" stroke-width="1.5" marker-end="url(#ah-pnk)"/>
+<text x="1201" y="1053" font-size="10" fill="#e91e63">토근 일정 더 보기</text>
+
+<!-- 일정목록관리 → 일정상세페이지 (일정 클릭) -->
+<line x1="1328" y1="1120" x2="1328" y2="1215" stroke="#333" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="1333" y="1175" font-size="11" fill="#333">일정 클릭</text>
+
+<!-- 일정/과제캘린더 과제클릭 → 과제상세페이지 (핑크 아래) -->
+<path d="M1100,1200 L1100,1240 L1088,1240 L1088,1280" stroke="#e91e63" stroke-width="1.5" fill="none" marker-end="url(#ah-pnk)"/>
+<text x="1105" y="1238" font-size="11" fill="#e91e63">과제 클릭</text>
+
+<!-- 일정/과제캘린더 일정클릭 → 일정상세페이지 -->
+<path d="M1170,1165 L1280,1165 L1280,1215" stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+<text x="1175" y="1158" font-size="11" fill="#333">일정 클릭</text>
+
+<!-- 일정상세페이지 → 과제상세페이지 (파란 위 화살표) -->
+<path d="M1240,1265 L1200,1265 L1200,1380 L1175,1380" stroke="#1565c0" stroke-width="1.5" fill="none" marker-end="url(#ah-blue)"/>
+
+</svg>
+</div>
+
+<script>
+function downloadSVG() {
+  const svg = document.getElementById('main-svg');
+  const blob = new Blob([svg.outerHTML], {type: 'image/svg+xml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'clubdx-flowchart.svg';
+  a.click();
+}
+function copySVG() {
+  const svg = document.getElementById('main-svg');
+  navigator.clipboard.writeText(svg.outerHTML).then(() => {
+    alert('SVG 복사됨! Figma에서 Ctrl+V (붙여넣기) 하세요.');
+  });
+}
+</script>
+</body>
+</html>

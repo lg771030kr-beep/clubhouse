@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Club DX — Low-Fidelity Wireframe</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+    background: #f0f0f0;
+    padding: 40px 24px;
+    color: #111;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 48px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ── 공통 phone frame ── */
+  .phone {
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.18);
+    position: relative;
+  }
+  .phone-label {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    color: #555;
+  }
+
+  /* ────────────────────────────────────
+     ADMIN — White Theme
+  ──────────────────────────────────── */
+  .admin {
+    background: #ffffff;
+    border: 2px solid #e0e0e0;
+  }
+
+  .admin-header {
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    padding: 28px 20px 20px;
+  }
+  .admin-badge {
+    display: inline-block;
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 999px;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    color: #444;
+    margin-bottom: 8px;
+  }
+  .admin-title {
+    font-size: 20px;
+    font-weight: 900;
+    color: #000;
+    letter-spacing: -0.03em;
+  }
+  .admin-sub {
+    font-size: 10px;
+    color: rgba(0,0,0,0.5);
+    margin-top: 3px;
+  }
+
+  .admin-body {
+    padding: 0 12px 28px;
+    background: #fff;
+    margin-top: -12px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* 3-col summary bar */
+  .summary-bar {
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .summary-col {
+    padding: 14px 10px;
+    text-align: center;
+    border-right: 1px solid rgba(0,0,0,0.08);
+    cursor: pointer;
+  }
+  .summary-col:last-child { border-right: none; }
+  .summary-col .num { font-size: 20px; font-weight: 900; color: #000; }
+  .summary-col .unit { font-size: 8px; color: rgba(0,0,0,0.4); font-weight: 700; margin-left: 1px; }
+  .summary-col .lbl { font-size: 9px; color: rgba(0,0,0,0.5); font-weight: 700; margin-top: 2px; }
+
+  .a-card {
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 20px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .a-card-title {
+    font-size: 11px;
+    font-weight: 900;
+    color: #000;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .icon-box {
+    width: 22px; height: 22px;
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  /* QR section */
+  .qr-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .select-mock {
+    background: rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 12px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 10px;
+    color: rgba(0,0,0,0.6);
+    font-weight: 700;
+  }
+  .btn-black {
+    background: #000;
+    color: #fff;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 9px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .btn-black-full {
+    background: #000;
+    color: #fff;
+    border-radius: 999px;
+    padding: 9px 0;
+    font-size: 9px;
+    font-weight: 900;
+    text-align: center;
+    margin-top: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Club row */
+  .club-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .club-row:last-child { border-bottom: none; }
+  .avatar-box {
+    width: 28px; height: 28px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 8px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  .club-info { flex: 1; }
+  .club-name { font-size: 10px; font-weight: 900; color: #000; }
+  .progress-bar {
+    height: 3px;
+    background: rgba(0,0,0,0.08);
+    border-radius: 999px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .progress-fill { height: 100%; background: rgba(0,0,0,0.5); border-radius: 999px; }
+  .pct { font-size: 9px; font-weight: 900; color: #000; }
+
+  /* ────────────────────────────────────
+     USER — Dark Theme
+  ──────────────────────────────────── */
+  .user {
+    background: #000;
+    border: 2px solid #1a1a1a;
+  }
+
+  .user-header {
+    background: #000;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 28px 20px 20px;
+  }
+  .user-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 999px;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 8px;
+  }
+  .user-title { font-size: 20px; font-weight: 900; color: #fff; letter-spacing: -0.03em; }
+  .user-sub { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 3px; }
+
+  .user-body {
+    padding: 0 12px 28px;
+    background: #000;
+    margin-top: -12px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .u-card {
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .u-card-title {
+    font-size: 11px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .u-icon-box {
+    width: 22px; height: 22px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  /* 3-col user summary */
+  .u-summary-bar {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .u-summary-col {
+    padding: 14px 10px;
+    text-align: center;
+    border-right: 1px solid rgba(255,255,255,0.08);
+  }
+  .u-summary-col:last-child { border-right: none; }
+  .u-summary-col .num { font-size: 20px; font-weight: 900; color: #fff; }
+  .u-summary-col .unit { font-size: 8px; color: rgba(255,255,255,0.4); font-weight: 700; }
+  .u-summary-col .lbl { font-size: 9px; color: rgba(255,255,255,0.4); font-weight: 700; margin-top: 2px; }
+
+  /* Activity item */
+  .u-activity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .u-activity-row:last-child { border-bottom: none; }
+  .u-dot {
+    width: 6px; height: 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.4);
+    flex-shrink: 0;
+  }
+  .u-act-info { flex: 1; }
+  .u-act-name { font-size: 10px; font-weight: 900; color: #fff; }
+  .u-act-date { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 2px; }
+  .u-badge {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 999px;
+    font-size: 8px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.7);
+    padding: 2px 7px;
+  }
+  .u-badge.white {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+  }
+
+  /* Pill action buttons */
+  .pill-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .btn-white {
+    background: #fff;
+    color: #000;
+    border-radius: 999px;
+    padding: 10px 0;
+    font-size: 9px;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+  .btn-outline-w {
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 999px;
+    padding: 10px 0;
+    font-size: 9px;
+    font-weight: 900;
+    text-align: center;
+  }
+
+  /* Week roadmap strip */
+  .roadmap-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+  .roadmap-col {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px 8px;
+  }
+  .roadmap-col.current {
+    border-color: rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.07);
+  }
+  .roadmap-week { font-size: 8px; font-weight: 900; color: rgba(255,255,255,0.5); margin-bottom: 6px; }
+  .roadmap-col.current .roadmap-week { color: #fff; }
+  .roadmap-item {
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 5px 6px;
+    margin-bottom: 4px;
+    font-size: 8px;
+    color: rgba(255,255,255,0.6);
+    font-weight: 700;
+  }
+
+  /* stub badge */
+  .stub {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #fffbe6;
+    border: 1px dashed #f0a800;
+    border-radius: 999px;
+    font-size: 8px;
+    font-weight: 900;
+    color: #b07800;
+    padding: 2px 8px;
+    margin-left: 4px;
+  }
+
+  /* sidebar */
+  .sidebar {
+    width: 56px;
+    background: rgba(255,255,255,0.03);
+    border-right: 1px solid rgba(255,255,255,0.07);
+    padding: 16px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .sidebar-item {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .sidebar-item.active {
+    background: #fff;
+  }
+
+  .a-sidebar {
+    width: 56px;
+    background: rgba(0,0,0,0.03);
+    border-right: 1px solid rgba(0,0,0,0.07);
+    padding: 16px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .a-sidebar-item {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .a-sidebar-item.active { background: #000; }
+
+  .frame-inner {
+    display: flex;
+    min-height: 680px;
+  }
+  .frame-content { flex: 1; overflow: hidden; }
+
+  /* legend */
+  .legend {
+    max-width: 1200px;
+    margin: 40px auto 0;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 700; color: #555;
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Club DX — Low-Fidelity Wireframe · Admin vs User Dashboard</h1>
+
+<div class="grid">
+
+  <!-- ════════════════════════════════════
+       ADMIN DASHBOARD
+  ════════════════════════════════════ -->
+  <div>
+    <p class="phone-label">🛡️ Admin Dashboard — White Theme</p>
+    <div class="phone admin">
+      <div class="frame-inner">
+
+        <!-- Sidebar -->
+        <div class="a-sidebar">
+          <div class="a-sidebar-item active" title="대시보드">🏠</div>
+          <div class="a-sidebar-item" title="부원 관리">👥</div>
+          <div class="a-sidebar-item" title="출결">📋</div>
+          <div class="a-sidebar-item" title="일정">📅</div>
+          <div class="a-sidebar-item" title="설정">⚙️</div>
+        </div>
+
+        <div class="frame-content">
+          <!-- Header -->
+          <div class="admin-header">
+            <div class="admin-badge">● Administrator</div>
+            <div class="admin-title">관리자 대시보드</div>
+            <div class="admin-sub">동아리 현황을 한눈에 파악하고 관리하세요.</div>
+          </div>
+
+          <!-- Body -->
+          <div class="admin-body">
+
+            <!-- 1. 슬림 요약 바 (클릭 → 상세 이동) -->
+            <div style="font-size:9px;font-weight:900;color:rgba(0,0,0,0.4);margin:14px 0 6px;letter-spacing:.08em">✨ 동아리 현황 — 실시간 DB</div>
+            <div class="summary-bar">
+              <div class="summary-col">
+                <div><span class="num">42</span><span class="unit">명</span></div>
+                <div class="lbl">총 인원 →</div>
+              </div>
+              <div class="summary-col">
+                <div><span class="num">35</span><span class="unit">명</span></div>
+                <div class="lbl">오늘 출석 →</div>
+              </div>
+              <div class="summary-col">
+                <div><span class="num">5</span><span class="unit">건</span></div>
+                <div class="lbl">활성 과제 →</div>
+              </div>
+            </div>
+
+            <!-- 2. QR 카드 -->
+            <div class="a-card">
+              <div class="a-card-title">
+                <div class="icon-box">🔳</div>
+                출석 QR 시작하기
+              </div>
+              <div class="qr-row">
+                <div class="select-mock">3월 22일 정기세션 ▾</div>
+                <div class="btn-black">QR 생성</div>
+              </div>
+              <div class="btn-black-full">+ 일정 및 과제 추가하기</div>
+            </div>
+
+            <!-- 3. 인기 동아리 (DB fetch) -->
+            <div class="a-card">
+              <div class="a-card-title">
+                <div class="icon-box">📣</div>
+                인기 동아리 — DB fetch
+              </div>
+              <div class="club-row">
+                <div class="avatar-box">🏢</div>
+                <div class="club-info">
+                  <div class="club-name">멋쟁이사자처럼</div>
+                  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+                </div>
+                <div class="pct">100%</div>
+              </div>
+              <div class="club-row">
+                <div class="avatar-box">🏢</div>
+                <div class="club-info">
+                  <div class="club-name">GDSC 개발 스터디</div>
+                  <div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div>
+                </div>
+                <div class="pct">72%</div>
+              </div>
+              <div class="club-row">
+                <div class="avatar-box">🏢</div>
+                <div class="club-info">
+                  <div class="club-name">UMC 안드로이드</div>
+                  <div class="progress-bar"><div class="progress-fill" style="width:55%"></div></div>
+                </div>
+                <div class="pct">55%</div>
+              </div>
+              <div class="btn-black-full">더 많은 동아리 →</div>
+            </div>
+
+          </div><!-- /admin-body -->
+        </div><!-- /frame-content -->
+      </div><!-- /frame-inner -->
+    </div><!-- /phone -->
+  </div>
+
+  <!-- ════════════════════════════════════
+       USER DASHBOARD
+  ════════════════════════════════════ -->
+  <div>
+    <p class="phone-label">👤 User Dashboard — Dark Theme</p>
+    <div class="phone user">
+      <div class="frame-inner">
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <div class="sidebar-item active" title="대시보드">🏠</div>
+          <div class="sidebar-item" title="포트폴리오">📁</div>
+          <div class="sidebar-item" title="마이페이지">👤</div>
+          <div class="sidebar-item" title="탐색">🔭</div>
+        </div>
+
+        <div class="frame-content">
+          <!-- Header -->
+          <div class="user-header">
+            <div class="user-badge">● Active Member</div>
+            <div class="user-title">안녕하세요 👋</div>
+            <div class="user-sub">오늘의 활동을 확인하세요.</div>
+          </div>
+
+          <!-- Body -->
+          <div class="user-body">
+
+            <!-- 1. 슬림 요약 바 -->
+            <div style="font-size:9px;font-weight:900;color:rgba(255,255,255,0.3);margin:14px 0 6px;letter-spacing:.08em">나의 이번 주 현황 — 실시간 DB</div>
+            <div class="u-summary-bar">
+              <div class="u-summary-col">
+                <div><span class="num">6</span><span class="unit" style="color:rgba(255,255,255,0.4)">회</span></div>
+                <div class="lbl">출석</div>
+              </div>
+              <div class="u-summary-col">
+                <div><span class="num">2</span><span class="unit" style="color:rgba(255,255,255,0.4)">건</span></div>
+                <div class="lbl">과제</div>
+              </div>
+              <div class="u-summary-col">
+                <div><span class="num">1</span><span class="unit" style="color:rgba(255,255,255,0.4)">개</span></div>
+                <div class="lbl">행사</div>
+              </div>
+            </div>
+
+            <!-- 2. Pill Action Buttons -->
+            <div style="font-size:9px;font-weight:900;color:rgba(255,255,255,0.3);margin:10px 0 6px;letter-spacing:.08em">핵심 액션</div>
+            <div class="pill-row">
+              <div class="btn-white">🔳 QR 출석 체크</div>
+              <div class="btn-outline-w">
+                📝 과제 제출
+                <span class="stub">🚧 미구현</span>
+              </div>
+            </div>
+            <div class="pill-row">
+              <div class="btn-outline-w">🔭 동아리 탐색</div>
+              <div class="btn-outline-w">📣 모집 공고</div>
+            </div>
+
+            <!-- 3. 최근 활동 (DB fetch) -->
+            <div class="u-card">
+              <div class="u-card-title">
+                <div class="u-icon-box">📋</div>
+                최근 활동 — attendance DB
+              </div>
+              <div class="u-activity-row">
+                <div class="u-dot" style="background:#fff"></div>
+                <div class="u-act-info">
+                  <div class="u-act-name">3주차 정기 세션</div>
+                  <div class="u-act-date">2026.03.18 · 멋쟁이사자처럼</div>
+                </div>
+                <div class="u-badge white">출석</div>
+              </div>
+              <div class="u-activity-row">
+                <div class="u-dot"></div>
+                <div class="u-act-info">
+                  <div class="u-act-name">1주차 과제 제출</div>
+                  <div class="u-act-date">2026.03.14 · GDSC</div>
+                </div>
+                <div class="u-badge">과제</div>
+              </div>
+              <div class="u-activity-row">
+                <div class="u-dot"></div>
+                <div class="u-act-info">
+                  <div class="u-act-name">UI/UX 워크샵</div>
+                  <div class="u-act-date">2026.03.16 · UMC</div>
+                </div>
+                <div class="u-badge">행사</div>
+              </div>
+            </div>
+
+            <!-- 4. 주차별 로드맵 -->
+            <div class="u-card">
+              <div class="u-card-title">
+                <div class="u-icon-box">🗓</div>
+                주차별 로드맵 — schedules DB
+              </div>
+              <div class="roadmap-strip">
+                <div class="roadmap-col">
+                  <div class="roadmap-week">지난 주</div>
+                  <div class="roadmap-item">OT 세션</div>
+                  <div class="roadmap-item">과제 마감</div>
+                </div>
+                <div class="roadmap-col current">
+                  <div class="roadmap-week">이번 주 ★</div>
+                  <div class="roadmap-item">정기 세션</div>
+                  <div class="roadmap-item">과제 예정</div>
+                </div>
+                <div class="roadmap-col">
+                  <div class="roadmap-week">다음 주</div>
+                  <div class="roadmap-item">발표회</div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /user-body -->
+        </div><!-- /frame-content -->
+      </div><!-- /frame-inner -->
+    </div><!-- /phone -->
+  </div>
+
+</div><!-- /grid -->
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#000"></div> 구현 완료</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f0a800;border:1px dashed #b07800"></div> 🚧 개발 필요</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e0e0e0"></div> Supabase 실시간 연동</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#555"></div> 모달/팝업 시스템</div>
+</div>
+
+<p style="text-align:center;margin-top:32px;font-size:10px;color:#aaa;font-weight:700;letter-spacing:.08em">
+  CLUB DX · LOW-FIDELITY WIREFRAME · 2026.03.22
+</p>
+
+</body>
+</html>

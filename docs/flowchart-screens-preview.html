@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>Club DX — 앱 화면 플로우차트</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #e8e8e8; font-family: -apple-system, sans-serif; }
+  .toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: #111; color: #fff; padding: 10px 20px;
+    display: flex; align-items: center; gap: 16px; font-size: 13px;
+  }
+  .toolbar strong { font-size: 15px; }
+  .toolbar button {
+    background: #333; border: none; color: #fff; padding: 6px 16px;
+    border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  .toolbar button:hover { background: #555; }
+  .tip { color: #999; font-size: 11px; }
+  .canvas {
+    padding-top: 50px;
+    overflow: auto;
+    min-height: 100vh;
+  }
+  #svg-container {
+    display: inline-block;
+    padding: 24px;
+    transform-origin: top left;
+  }
+  #svg-container svg {
+    display: block;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    border-radius: 12px;
+  }
+  .zoom-info { color: #aaa; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <strong>Club DX 앱 플로우차트</strong>
+  <button onclick="zoomIn()">확대 +</button>
+  <button onclick="zoomOut()">축소 −</button>
+  <button onclick="resetZoom()">100%</button>
+  <span class="zoom-info" id="zoom-label">100%</span>
+  <span style="flex:1"></span>
+  <span class="tip">Figma 가져오기: docs/clubdx-flowchart-screens.svg 파일을 Figma에서 Import</span>
+  <button onclick="downloadSVG()">SVG 다운로드</button>
+</div>
+<div class="canvas">
+  <div id="svg-container">
+    <!-- SVG will be injected here -->
+  </div>
+</div>
+
+<script>
+let zoom = 0.6;
+
+function applyZoom() {
+  document.getElementById('svg-container').style.transform = `scale(${zoom})`;
+  document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+}
+
+function zoomIn()    { zoom = Math.min(2, zoom + 0.1); applyZoom(); }
+function zoomOut()   { zoom = Math.max(0.2, zoom - 0.1); applyZoom(); }
+function resetZoom() { zoom = 0.6; applyZoom(); }
+
+function downloadSVG() {
+  const a = document.createElement('a');
+  a.href = 'clubdx-flowchart-screens.svg';
+  a.download = 'clubdx-flowchart-screens.svg';
+  a.click();
+}
+
+// SVG 파일을 fetch해서 inline으로 삽입
+fetch('clubdx-flowchart-screens.svg')
+  .then(r => r.text())
+  .then(svgText => {
+    document.getElementById('svg-container').innerHTML = svgText;
+    applyZoom();
+  })
+  .catch(e => {
+    document.getElementById('svg-container').innerHTML = '<p style="color:red;padding:20px">SVG 로드 실패: ' + e.message + '</p>';
+  });
+
+applyZoom();
+</script>
+</body>
+</html>
