@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   ChevronLeft, ChevronRight, Search,
-  Eye, Flame, Users, Layers, CheckCircle2, Clock, Zap,
+  Eye, Flame, Users, Layers, CheckCircle2, Clock, Zap, Loader2,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Project {
-  id: number;
+  id: number | string;
   title: string;
   clubName: string;
   clubEmoji: string;
@@ -21,44 +21,6 @@ interface Project {
   members: number;
 }
 
-const ALL_PROJECTS: Project[] = [
-  {
-    id: 1, title: 'Club DX 메인 앱 개발', clubName: 'Club DX 개발팀', clubEmoji: '💻', emoji: '📱',
-    description: '동아리 멤버 관리, 출석 체크, 일정 공유 등을 하나로 통합한 올인원 동아리 앱.',
-    techStack: ['React', 'TypeScript', 'Supabase', 'Tailwind CSS'],
-    status: '진행중', views: 1240, isHot: true, members: 6,
-  },
-  {
-    id: 2, title: '브랜딩 리뉴얼 프로젝트', clubName: '크리에이티브 디자인', clubEmoji: '🎨', emoji: '🎯',
-    description: '동아리 전체 비주얼 아이덴티티(VI) 재정립 프로젝트.',
-    techStack: ['Figma', 'Adobe Illustrator', 'After Effects'],
-    status: '완료', views: 873, isHot: true, members: 4,
-  },
-  {
-    id: 3, title: '신입 온보딩 자동화', clubName: 'Club DX 개발팀', clubEmoji: '💻', emoji: '🤖',
-    description: '신입 부원 환영 키트 자동 발송, 멘토 매칭, OT 일정 안내를 자동화하는 봇 시스템.',
-    techStack: ['Python', 'Slack API', 'Google Sheets'],
-    status: '준비중', views: 542, isHot: false, members: 3,
-  },
-  {
-    id: 4, title: '캠퍼스 마케팅 캠페인', clubName: '마케팅 보이즈', clubEmoji: '📣', emoji: '🚀',
-    description: '교내 스타트업과 협업한 SNS 바이럴 마케팅 캠페인.',
-    techStack: ['Canva', 'Meta Ads', 'Google Analytics'],
-    status: '진행중', views: 410, isHot: false, members: 5,
-  },
-  {
-    id: 5, title: '인디 게임 "스페이스 리프트"', clubName: '게임 크리에이터', clubEmoji: '🎮', emoji: '🌌',
-    description: '2D 픽셀 아트 기반 우주 탈출 게임. 글로벌 게임잼 72시간 챌린지 출품작.',
-    techStack: ['Unity', 'C#', 'Aseprite', 'FMOD'],
-    status: '완료', views: 690, isHot: true, members: 7,
-  },
-  {
-    id: 6, title: '알고리즘 문제 풀이 플랫폼', clubName: '알고리즘 스터디', clubEmoji: '🧠', emoji: '💡',
-    description: '스터디원끼리 풀이를 공유하고 리뷰하는 코드 리뷰 전용 플랫폼.',
-    techStack: ['Next.js', 'PostgreSQL', 'Judge0 API'],
-    status: '진행중', views: 320, isHot: false, members: 4,
-  },
-];
 
 const STATUS_ICON: Record<Project['status'], React.FC<{ className?: string }>> = {
   '진행중': ({ className }) => <span className={`inline-block w-1.5 h-1.5 rounded-full bg-white ${className}`} />,
@@ -68,12 +30,23 @@ const STATUS_ICON: Record<Project['status'], React.FC<{ className?: string }>> =
 
 const FILTER_TABS = ['전체', '진행중', '완료', '준비중'] as const;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapProject(p: any): Project {
+interface ProjectRow {
+  id: number | string;
+  title: string | null;
+  description: string | null;
+  image_url?: string | null;
+  views?: number | null;
+  status: string | null;
+  tech_stack?: string[] | null;
+  member_count?: number | null;
+  clubs: { id: string; name: string; category?: string | null } | { id: string; name: string; category?: string | null }[] | null;
+}
+
+function mapProject(p: ProjectRow): Project {
   return {
     id:          p.id,
     title:       p.title ?? '제목 없음',
-    clubName:    p.clubs?.name ?? '알 수 없음',
+    clubName:    (Array.isArray(p.clubs) ? p.clubs[0]?.name : p.clubs?.name) ?? '알 수 없음',
     clubEmoji:   '📁',
     emoji:       '📁',
     description: p.description ?? '',
@@ -89,15 +62,20 @@ export function UserProjects() {
   const navigate = useNavigate();
   const [query,    setQuery]    = useState('');
   const [status,   setStatus]   = useState<'전체' | Project['status']>('전체');
-  const [projects, setProjects] = useState<Project[]>(ALL_PROJECTS);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     async function loadProjects() {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, title, description, image_url, views, status, tech_stack, member_count, clubs(id, name, category)')
-        .order('views', { ascending: false });
-      if (!error && data && data.length > 0) setProjects(data.map(mapProject));
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('id, title, description, image_url, views, status, tech_stack, member_count, clubs(id, name, category)')
+          .order('views', { ascending: false });
+        if (!error && data) setProjects((data as ProjectRow[]).map(mapProject));
+      } finally {
+        setLoading(false);
+      }
     }
     loadProjects();
   }, []);
@@ -170,10 +148,17 @@ export function UserProjects() {
         <p className="text-xs font-bold text-white/50 px-1">{filtered.length}개의 프로젝트</p>
 
         {/* ── 프로젝트 카드 ── */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20 gap-2 text-white/40">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm font-bold">불러오는 중...</span>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="bg-black rounded-3xl border border-white/20 py-16 text-center">
-            <p className="text-3xl mb-3">🔍</p>
-            <p className="text-white font-bold text-sm">검색 결과가 없습니다</p>
+            <p className="text-3xl mb-3">{query || status !== '전체' ? '🔍' : '📭'}</p>
+            <p className="text-white font-bold text-sm">
+              {query || status !== '전체' ? '검색 결과가 없습니다' : '등록된 프로젝트가 없습니다'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">

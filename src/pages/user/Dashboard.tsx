@@ -30,7 +30,7 @@ type HotProject = {
 };
 
 export function UserDashboard() {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdminMode } = useAuth();
   const navigate = useNavigate();
   const userName = profile?.full_name || '김부원';
 
@@ -43,6 +43,39 @@ export function UserDashboard() {
   const [hotProjects,      setHotProjects]      = useState<HotProject[]>([]);
   const [selectedProject,  setSelectedProject]  = useState<HotProject | null>(null);
   const [newSchedule, setNewSchedule] = useState({ title: '', date: '', time: '', description: '' });
+
+  // 일정 제안 가능 동아리: club_members.role = CAPTAIN or LEADER 인 클럽만
+  const [eligibleClubs,  setEligibleClubs]  = useState<{ id: string; name: string; role: string }[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string>('');
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    interface MemberWithClub {
+      club_id: string;
+      role: string;
+      clubs: { id: string; name: string } | { id: string; name: string }[] | null;
+    }
+
+    supabase
+      .from('club_members')
+      .select('club_id, role, clubs(id, name)')
+      .eq('user_id', user.id)
+      .in('role', ['CAPTAIN', 'LEADER'])
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const list = (data as MemberWithClub[]).map((m) => {
+          const club = Array.isArray(m.clubs) ? m.clubs[0] : m.clubs;
+          return {
+            id:   club?.id   ?? m.club_id,
+            name: club?.name ?? '동아리',
+            role: m.role,
+          };
+        });
+        setEligibleClubs(list);
+        setSelectedClubId(list[0].id);
+      });
+  }, [user?.id]);
 
   useEffect(() => { if (profile?.univ_name) void fetchClub(); }, [profile?.univ_name]);
   useEffect(() => { void fetchRecruitingClubs(); void fetchHotProjects(); }, []);
@@ -58,24 +91,24 @@ export function UserDashboard() {
     try {
       const { data, error } = await supabase.from('clubs')
         .select('id, name, category, logo_url, is_recruiting')
-        .eq('is_recruiting', true).order('created_at', { ascending: false }).limit(12);
+        .eq('is_recruiting', true)
+        .order('created_at', { ascending: false })
+        .limit(12);
+
       if (error) throw error;
-      setRecruitingClubs((data as RecruitingClub[]) || []);
+      setRecruitingClubs((data ?? []) as RecruitingClub[]);
     } catch { setRecruitingClubs([]); }
   };
+
   const fetchHotProjects = async () => {
     try {
-      const { data: joined, error: joinedError } = await supabase.from('projects')
+      const { data, error } = await supabase.from('projects')
         .select('id, title, description, image_url, views, club_id, clubs(id, name)')
-        .order('views', { ascending: false }).limit(3);
-      if (joinedError) {
-        const { data: plain } = await supabase.from('projects')
-          .select('id, title, description, image_url, views, club_id')
-          .order('views', { ascending: false }).limit(3);
-        setHotProjects((plain as HotProject[]) || []);
-        return;
-      }
-      setHotProjects((joined as HotProject[]) || []);
+        .order('views', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      setHotProjects((data ?? []) as HotProject[]);
     } catch { setHotProjects([]); }
   };
 
@@ -93,7 +126,8 @@ export function UserDashboard() {
         date: newSchedule.date, time: newSchedule.time,
         description: newSchedule.description, is_approved: false, location: '',
       };
-      if (clubInfo?.id) payload.club_id = clubInfo.id;
+      // 반드시 해당 역할을 가진 동아리의 club_id만 사용 (타 동아리 간섭 방지)
+      if (selectedClubId) payload.club_id = selectedClubId;
       const { error } = await supabase.from('schedules').insert([payload]);
       if (error) throw error;
       setIsAddingSchedule(false);
@@ -109,29 +143,52 @@ export function UserDashboard() {
     setTimeout(() => setToastMessage(null), 3200);
   };
 
-  const handleScanSuccess = async (token: string) => {
+  const handleScanSuccess = async (rawText: string) => {
     setIsScannerOpen(false);
     if (!user) { showToast('로그인이 필요합니다.', 'error'); return; }
     try {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-      let parsed: { v?: number; schedule_id?: string; date?: string } | null = null;
-      try { parsed = JSON.parse(token); } catch { /* plain token fallback */ }
-      if (!parsed?.v || parsed.v < 2 || !parsed.schedule_id || !parsed.date) {
+
+      type QRv2 = { v: 2; schedule_id: string; date: string };
+      type QRv3 = { v: 3; token: string; date: string };
+      let parsed: QRv2 | QRv3 | null = null;
+      try { parsed = JSON.parse(rawText); } catch { /* invalid JSON */ }
+
+      if (!parsed?.v || parsed.v < 2 || !parsed.date) {
         showToast('유효하지 않은 QR입니다.', 'error'); return;
       }
       if (parsed.date !== todayStr) {
-        showToast(`유효하지 않은 QR입니다. (${parsed.date} 발급)`, 'error'); return;
+        showToast('오늘 날짜의 QR이 아닙니다.', 'error'); return;
       }
-      const { data: schedule, error: schErr } = await supabase
-        .from('schedules').select('id, date, is_approved')
-        .eq('id', parsed.schedule_id).maybeSingle();
-      if (schErr || !schedule) { showToast('유효하지 않은 QR입니다.', 'error'); return; }
-      if (!schedule.is_approved) { showToast('미승인 일정의 QR입니다.', 'error'); return; }
-      if (schedule.date !== todayStr) { showToast('오늘 날짜의 QR이 아닙니다.', 'error'); return; }
+
+      let scheduleId: string;
+
+      if (parsed.v === 3) {
+        // v3: qr_code_token 으로 일정 조회 (schedule_id 미노출 방식)
+        const { data: sched, error: tokErr } = await supabase
+          .from('schedules').select('id, date, is_approved')
+          .eq('qr_code_token', (parsed as QRv3).token).maybeSingle();
+        if (tokErr || !sched) { showToast('유효하지 않은 QR입니다.', 'error'); return; }
+        if (!sched.is_approved)     { showToast('미승인 일정의 QR입니다.', 'error'); return; }
+        if (sched.date !== todayStr) { showToast('오늘 날짜의 QR이 아닙니다.', 'error'); return; }
+        scheduleId = sched.id;
+      } else {
+        // v2: schedule_id 직접 포함 (하위 호환)
+        const v2 = parsed as QRv2;
+        if (!v2.schedule_id) { showToast('유효하지 않은 QR입니다.', 'error'); return; }
+        const { data: sched, error: schErr } = await supabase
+          .from('schedules').select('id, date, is_approved')
+          .eq('id', v2.schedule_id).maybeSingle();
+        if (schErr || !sched) { showToast('유효하지 않은 QR입니다.', 'error'); return; }
+        if (!sched.is_approved)     { showToast('미승인 일정의 QR입니다.', 'error'); return; }
+        if (sched.date !== todayStr) { showToast('오늘 날짜의 QR이 아닙니다.', 'error'); return; }
+        scheduleId = sched.id;
+      }
+
       const { error: attendanceError } = await supabase.from('attendance').upsert(
-        { schedule_id: schedule.id, user_id: user.id, status: 'PRESENT', marked_at: new Date().toISOString() },
+        { schedule_id: scheduleId, user_id: user.id, status: 'PRESENT', marked_at: new Date().toISOString() },
         { onConflict: 'schedule_id,user_id' }
       );
       attendanceError
@@ -220,14 +277,21 @@ export function UserDashboard() {
           {/* ── 구분선 ── */}
           <div className="border-t border-white/8 my-1" />
 
-          {/* ── LEADER 일정 제안 ── */}
-          {profile?.role?.toUpperCase() === 'LEADER' && (
+          {/* ── 팀장/운영진 전용: 일정 제안 (CAPTAIN or LEADER 역할인 경우만 표시) ── */}
+          {eligibleClubs.length > 0 && (
             <motion.section custom={2} variants={fadeUp}>
               <div className="bg-black rounded-3xl border border-white/10 p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="rounded-full bg-white text-black px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
-                    Leader
-                  </span>
+                  {/* 가장 높은 권한 배지 표시: LEADER > CAPTAIN */}
+                  {eligibleClubs.some(c => c.role === 'LEADER') ? (
+                    <span className="rounded-full bg-white text-black px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
+                      LEADER
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-white/20 text-white px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
+                      CAPTAIN
+                    </span>
+                  )}
                   <p className="text-xs font-medium text-white/40">운영진 승인 후 반영됩니다.</p>
                 </div>
                 <motion.button
@@ -371,6 +435,33 @@ export function UserDashboard() {
                 </button>
               </div>
               <form onSubmit={handleCreateTeamSchedule} className="space-y-4 overflow-y-auto px-6 py-5">
+
+                {/* 동아리 선택 — CAPTAIN/LEADER 권한을 가진 동아리만 표시 */}
+                {eligibleClubs.length > 1 ? (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-black text-white/50 block">동아리 선택</label>
+                    <select
+                      value={selectedClubId}
+                      onChange={e => setSelectedClubId(e.target.value)}
+                      className={inp + ' [color-scheme:dark]'}
+                    >
+                      {eligibleClubs.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} · {c.role === 'LEADER' ? '운영진' : '팀장'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : eligibleClubs.length === 1 ? (
+                  <div className="flex items-center gap-2 rounded-2xl bg-white/5 border border-white/8 px-4 py-3">
+                    <span className="text-xs font-black text-white/40">동아리</span>
+                    <span className="text-xs font-black text-white flex-1">{eligibleClubs[0].name}</span>
+                    <span className="text-[10px] font-black text-white/30 uppercase">
+                      {eligibleClubs[0].role === 'LEADER' ? '운영진' : '팀장'}
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-black text-white/50 block">일정명</label>
                   <input required type="text"

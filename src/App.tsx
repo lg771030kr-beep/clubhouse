@@ -6,6 +6,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/Layout';
+import { Login } from './pages/auth/Login';
+import { SignUp } from './pages/auth/SignUp';
 import { Dashboard } from './pages/Dashboard';
 import { MemberManagement } from './pages/admin/MemberManagement';
 import { Schedules } from './pages/admin/Schedules';
@@ -19,7 +21,7 @@ import { AllProjects } from './pages/AllProjects';
 import { AdminProjectDetail } from './pages/admin/AdminProjectDetail';
 import { AttendanceDetail } from './pages/admin/AttendanceDetail';
 import { AssignmentStatus } from './pages/admin/AssignmentStatus';
-// import { MemberDetail } from './pages/admin/MemberDetail'; // 모달로 전환됨
+import { AdminArchive } from './pages/admin/AdminArchive';
 import { Recruitment } from './pages/explore/Recruitment';
 import { Projects } from './pages/explore/Projects';
 import { ScheduleCalendarPage } from './pages/user/ScheduleCalendarPage';
@@ -29,6 +31,8 @@ import { ClubList } from './pages/user/ClubList';
 import { UserProjects } from './pages/user/UserProjects';
 import { UserRecruitments } from './pages/user/UserRecruitments';
 import { ProjectDetail } from './pages/user/ProjectDetail';
+import { Welcome } from './pages/Welcome';
+import { CreateClub } from './pages/clubs/CreateClub';
 
 export default function App() {
   return (
@@ -36,6 +40,8 @@ export default function App() {
       <Router>
         <Layout>
           <Routes>
+            <Route path="/login"  element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             
@@ -54,7 +60,7 @@ export default function App() {
               {/* 정식 경로 */}
               <Route path="/admin/attendance"  element={<AttendanceDetail />} />
               <Route path="/admin/assignments" element={<AssignmentStatus />} />
-              {/* <Route path="/admin/member/:userId" element={<MemberDetail />} /> // 모달로 전환 */}
+              <Route path="/admin/archive"     element={<AdminArchive />} />
               {/* 레거시 경로 → 리다이렉트 */}
               <Route path="/admin/attendance-detail" element={<Navigate to="/admin/attendance"  replace />} />
               <Route path="/admin/assignment-status" element={<Navigate to="/admin/assignments" replace />} />
@@ -80,6 +86,10 @@ export default function App() {
             {/* Detail Routes */}
             <Route path="/club/:clubId" element={<ClubDetail />} />
             <Route path="/project/:projectId" element={<ProjectDetail />} />
+
+            {/* Onboarding */}
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/clubs/create" element={<CreateClub />} />
           </Routes>
         </Layout>
       </Router>

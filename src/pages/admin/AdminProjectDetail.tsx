@@ -35,37 +35,6 @@ interface ProjectDetail {
   created_at: string;
 }
 
-/* ══════════════════════════════════════════
-   Mock fallback
-══════════════════════════════════════════ */
-const MOCK: Record<string, Omit<ProjectDetail, 'id'>> = {
-  '1': {
-    title: 'Club DX 메인 앱 개발',
-    description: '동아리 관리 올인원 앱을 자체 개발합니다. 회원 관리, 출결, 과제, 일정, 모집 공고 등 모든 운영 업무를 하나의 앱에서 처리할 수 있도록 설계된 풀스택 웹 서비스입니다.',
-    status: 'active',
-    start_date: '2026-03-01',
-    end_date: '2026-06-30',
-    tech_stack: ['React', 'TypeScript', 'Supabase', 'Tailwind CSS'],
-    participants: [
-      { id: 'a', full_name: '김철수', role: 'Lead Developer' },
-      { id: 'b', full_name: '이영희', role: 'Frontend Dev' },
-      { id: 'c', full_name: '박민준', role: 'UI/UX Designer' },
-    ],
-    created_at: '2026-03-01',
-  },
-  '2': {
-    title: '브랜딩 리뉴얼 프로젝트',
-    description: '동아리 BI/CI 아이덴티티를 새롭게 정의합니다. 로고, 컬러 시스템, 타이포그래피를 전면 리뉴얼합니다.',
-    status: 'closed',
-    start_date: '2026-01-15',
-    end_date: '2026-02-28',
-    tech_stack: ['Figma', 'Adobe Illustrator'],
-    participants: [
-      { id: 'b', full_name: '이영희', role: 'Brand Designer' },
-    ],
-    created_at: '2026-01-15',
-  },
-};
 
 const STATUS_LABELS: Record<ProjectDetail['status'], string> = {
   active: '진행중', closed: '완료', draft: '준비중',
@@ -177,7 +146,7 @@ function EditModal({
     };
     try {
       await supabase.from('projects').update(payload).eq('id', project.id);
-    } catch { /* mock 환경에서는 무시 */ }
+    } catch { /* silent */ }
     onSave(payload);
     setSaving(false);
     onClose();
@@ -401,28 +370,33 @@ export function AdminProjectDetail() {
             .from('project_members')
             .select('id, role, profiles(id, full_name, avatar_url)')
             .eq('project_id', projectId);
+          type ProfJoin = { id: string; full_name: string | null; avatar_url?: string | null };
+          interface MemberRow {
+            id: string;
+            role: string | null;
+            profiles: ProfJoin | ProfJoin[] | null;
+          }
           if (members && members.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            participants = members.map((m: any) => ({
-              id:         m.profiles?.id ?? m.id,
-              full_name:  m.profiles?.full_name ?? '멤버',
-              role:       m.role ?? '팀원',
-              avatar_url: m.profiles?.avatar_url,
-            }));
+            participants = (members as unknown as MemberRow[]).map((m) => {
+              const pRaw = m.profiles;
+              const p = Array.isArray(pRaw) ? pRaw[0] : pRaw;
+              return {
+                id:         p?.id ?? m.id,
+                full_name:  p?.full_name ?? '멤버',
+                role:       m.role ?? '팀원',
+                avatar_url: p?.avatar_url,
+              };
+            });
           }
         } catch { /* skip */ }
 
         if (row) {
           setProject({ ...row, participants } as ProjectDetail);
         } else {
-          const mock = MOCK[projectId];
-          if (mock) setProject({ id: projectId, ...mock });
-          else setNotFound(true);
+          setNotFound(true);
         }
       } catch {
-        const mock = MOCK[projectId];
-        if (mock) setProject({ id: projectId, ...mock });
-        else setNotFound(true);
+        setNotFound(true);
       } finally {
         setLoading(false);
       }
@@ -472,7 +446,7 @@ export function AdminProjectDetail() {
   return (
     <>
       <div className="bg-white min-h-screen pb-16">
-        <div className="max-w-5xl mx-auto px-4 pt-6 space-y-6">
+        <div className="max-w-5xl mx-auto px-4 pt-14 space-y-6">
 
           <button
             onClick={() => navigate('/admin/projects')}

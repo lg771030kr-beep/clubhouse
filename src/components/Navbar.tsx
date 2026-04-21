@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Settings2, FolderOpen, ChevronDown, ChevronRight,
-  Settings, Megaphone as MegaphoneIcon, Rocket as RocketIcon,
-  RefreshCw, Check, Building2, Loader2,
+  Settings, Megaphone as MegaphoneIcon, Archive as ArchiveIcon,
+  RefreshCw, Check, Building2, Loader2, LogOut, Plus, Trash2,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -29,47 +29,88 @@ interface Club {
   id: string;
   name: string;
   description?: string;
+  logo_url?: string;
+  deleted_at?: string | null;
 }
 
 export const Navbar: React.FC = () => {
-  const { profile, isAdminMode, toggleAdminMode } = useAuth();
+  const { profile, isAdminMode, toggleAdminMode, signOut, activeClubId, switchClub } = useAuth();
   const navigate = useNavigate();
 
-  const avatarUrl   = (profile as any)?.avatar_url as string | undefined;
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch {
+      /* silent */
+    }
+  };
+
+  // 토글 시 해당 모드의 홈으로 이동
+  const handleToggle = () => {
+    toggleAdminMode();
+    if (!isAdminMode) {
+      // USER → ADMIN 전환
+      navigate('/admin', { replace: true });
+    } else {
+      // ADMIN → USER 전환
+      navigate('/', { replace: true });
+    }
+  };
+
+  const avatarUrl   = (profile as { avatar_url?: string } | null)?.avatar_url;
   const displayName = profile?.full_name || '김부원';
-  const clubName    = profile?.univ_name || 'Club DX';
 
   const [myClubs,         setMyClubs]         = useState<Club[]>([]);
-  const [activeClubId,    setActiveClubId]    = useState<string | null>(null);
+  const [activeClubName,  setActiveClubName]  = useState<string>('');
+  const [activeClubLogo,  setActiveClubLogo]  = useState<string | null>(null);
   const [isClubsLoading,  setIsClubsLoading]  = useState(false);
+
+  // 클럽 정보 fetch (어드민 모드일 때)
+  const fetchMyClubs = async () => {
+    if (!profile?.id) return;
+    setIsClubsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('clubs')
+        .select('id, name, description, logo_url, deleted_at')
+        .eq('admin_id', profile.id)
+        .order('name');
+      interface ClubRow { id: string; name: string; logo_url?: string | null; description?: string; deleted_at?: string | null; }
+      if (!error && data && data.length > 0) {
+        setMyClubs(data as ClubRow[]);
+        // activeClubId에 맞는 클럽 정보 표시 (없으면 첫 번째)
+        const rows = data as ClubRow[];
+        const current = rows.find((c) => c.id === activeClubId) ?? rows[0];
+        setActiveClubName(current.name);
+        setActiveClubLogo(current.logo_url ?? null);
+      }
+    } catch (err) {
+      console.error('clubs fetch error:', err);
+    } finally {
+      setIsClubsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!profile?.id || !isAdminMode) return;
-    const fetchMyClubs = async () => {
-      setIsClubsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('clubs')
-          .select('id, name, description')
-          .eq('admin_id', profile.id)
-          .order('name');
-        if (!error && data) {
-          setMyClubs(data as Club[]);
-          const current = (data as Club[]).find(c => c.name === profile.univ_name);
-          if (current) setActiveClubId(current.id);
-        }
-      } catch (err) {
-        console.error('clubs fetch error:', err);
-      } finally {
-        setIsClubsLoading(false);
-      }
-    };
     fetchMyClubs();
-  }, [profile?.id, profile?.univ_name, isAdminMode]);
+  }, [profile?.id, isAdminMode, activeClubId]);
 
-  const handleSwitchClub = (club: Club) => {
-    setActiveClubId(club.id);
-    navigate('/admin', { state: { clubId: club.id, clubName: club.name } });
+  // Settings 저장 후 갱신 이벤트 수신
+  useEffect(() => {
+    const handler = () => fetchMyClubs();
+    window.addEventListener('club-settings-saved', handler);
+    return () => window.removeEventListener('club-settings-saved', handler);
+  }, [profile?.id]);
+
+  const clubName = activeClubName || profile?.univ_name || 'Club DX';
+
+  const handleSwitchClub = (club: Club & { logo_url?: string }) => {
+    switchClub(club.id);          // context에 저장 → 전체 앱에서 참조
+    setActiveClubName(club.name);
+    setActiveClubLogo(club.logo_url ?? null);
+    navigate('/admin');           // 대시보드로 이동 (state 불필요)
   };
 
   return (
@@ -138,7 +179,15 @@ export const Navbar: React.FC = () => {
                 className="text-white hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
               >
                 <FolderOpen className="h-4 w-4 text-white/60 shrink-0" />
-                📂 포트폴리오
+                📂 활동 이력
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuItem
+                onSelect={handleSignOut}
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                로그아웃
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -155,9 +204,12 @@ export const Navbar: React.FC = () => {
                 aria-label="동아리 관리 메뉴"
               >
                 <span className="w-8 h-8 rounded-xl flex items-center justify-center
-                                 font-black text-white shadow-sm text-xs shrink-0
-                                 bg-white">
-                  {clubName.slice(0, 2)}
+                                 font-black shadow-sm text-xs shrink-0
+                                 bg-white overflow-hidden border border-white/20">
+                  {activeClubLogo
+                    ? <img src={activeClubLogo} alt="로고" className="w-full h-full object-cover" />
+                    : <span className="text-black">{clubName.slice(0, 2)}</span>
+                  }
                 </span>
                 <span className="text-sm font-bold truncate max-w-[130px] text-white">
                   {clubName}
@@ -185,11 +237,11 @@ export const Navbar: React.FC = () => {
               </DropdownMenuItem>
 
               <DropdownMenuItem
-                onSelect={() => navigate('/admin/projects')}
+                onSelect={() => navigate('/admin/archive')}
                 className="text-white hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
               >
-                <RocketIcon className="h-4 w-4 text-white/60 shrink-0" />
-                <span>🚀 프로젝트 관리</span>
+                <ArchiveIcon className="h-4 w-4 text-white/60 shrink-0" />
+                <span>🗂️ 동아리 아카이브</span>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator className="bg-white/15" />
@@ -222,35 +274,62 @@ export const Navbar: React.FC = () => {
                       <Loader2 className="h-4 w-4 animate-spin text-white/60" />
                       불러오는 중...
                     </div>
-                  ) : myClubs.length === 0 ? (
-                    <div className="px-3 py-3 text-center space-y-1">
-                      <Building2 className="h-6 w-6 text-white/40 mx-auto" />
-                      <p className="text-xs text-white/50 font-medium">운영 중인 동아리가 없습니다</p>
-                    </div>
                   ) : (
                     <>
-                      <DropdownMenuLabel className="text-[11px] text-white/70">
-                        운영 중인 동아리 ({myClubs.length})
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator className="bg-white/15" />
-                      {myClubs.map(club => (
-                        <DropdownMenuItem
-                          key={club.id}
-                          onSelect={() => handleSwitchClub(club)}
-                          className={cn(
-                            'text-white hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer',
-                            activeClubId === club.id && 'bg-white/20 text-white',
-                          )}
-                        >
-                          <span className="w-4 shrink-0 flex items-center justify-center">
-                            {activeClubId === club.id
-                              ? <Check className="h-3.5 w-3.5 text-white" />
-                              : <Building2 className="h-3.5 w-3.5 text-white/40" />
-                            }
-                          </span>
-                          <span className="flex-1 truncate">{club.name}</span>
-                        </DropdownMenuItem>
-                      ))}
+                      {myClubs.length > 0 && (
+                        <>
+                          <DropdownMenuLabel className="text-[11px] text-white/70">
+                            운영 중인 동아리 ({myClubs.length})
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator className="bg-white/15" />
+                          {myClubs.map(club => {
+                            const isDeleted = !!club.deleted_at;
+                            const isActive  = activeClubId === club.id;
+                            return (
+                              <DropdownMenuItem
+                                key={club.id}
+                                onSelect={() => handleSwitchClub(club)}
+                                className={cn(
+                                  'cursor-pointer',
+                                  isActive
+                                    ? 'bg-white/20 text-white hover:bg-white/25 focus:bg-white/25'
+                                    : 'text-white hover:bg-white/10 focus:bg-white/10',
+                                  isDeleted && 'opacity-60',
+                                )}
+                              >
+                                <span className="w-4 shrink-0 flex items-center justify-center">
+                                  {isDeleted
+                                    ? <Trash2 className="h-3.5 w-3.5 text-red-400/70" />
+                                    : isActive
+                                      ? <Check className="h-3.5 w-3.5 text-white" />
+                                      : <Building2 className="h-3.5 w-3.5 text-white/40" />
+                                  }
+                                </span>
+                                <span className={cn(
+                                  'flex-1 truncate',
+                                  isDeleted && 'line-through text-white/40',
+                                )}>
+                                  {club.name}
+                                </span>
+                                {isDeleted && (
+                                  <span className="text-[10px] text-red-400/70 font-bold ml-1 shrink-0">
+                                    삭제됨
+                                  </span>
+                                )}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                          <DropdownMenuSeparator className="bg-white/15" />
+                        </>
+                      )}
+                      {/* 신규 동아리 만들기 */}
+                      <DropdownMenuItem
+                        onSelect={() => navigate('/clubs/create')}
+                        className="text-white/60 hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                      >
+                        <Plus className="h-4 w-4 text-white/40 shrink-0" />
+                        <span>신규 동아리 만들기</span>
+                      </DropdownMenuItem>
                     </>
                   )}
                 </DropdownMenuSubContent>
@@ -275,7 +354,7 @@ export const Navbar: React.FC = () => {
           </span>
 
           <button
-            onClick={toggleAdminMode}
+            onClick={handleToggle}
             className={cn(
               'relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full',
               'border-2 border-transparent transition-colors duration-200 outline-none items-center shadow-inner',

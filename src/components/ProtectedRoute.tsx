@@ -1,27 +1,22 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Role } from '../types';
 
-interface ProtectedRouteProps {
-  allowedRoles?: Role[];
-  redirectPath?: string;
-}
-
-export function ProtectedRoute({ allowedRoles, redirectPath = '/' }: ProtectedRouteProps) {
-  const { user, profile, loading, isAdminMode } = useAuth();
+export function ProtectedRoute() {
+  const { profile, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="w-10 h-10 border-2 border-t-white border-r-transparent border-b-transparent
+                        border-l-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // MVP: 로그인 여부와 관계없이 토글된 상태(isAdminMode)만으로 관리자 페이지 접근을 제어합니다.
-  if (!isAdminMode) {
-    console.warn('[ProtectedRoute] Blocked: isAdminMode is false');
+  // 서버에서 가져온 실제 role로 판단 — 클라이언트 토글 상태(isAdminMode)는 신뢰하지 않음
+  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'LEADER';
+  if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 

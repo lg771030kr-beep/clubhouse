@@ -57,11 +57,20 @@ export function Profile() {
       setIsClubLoading(true);
       try {
         const { data, error } = await supabase
-          .from('members')
+          .from('club_members')
           .select('role, clubs(id, name, logo_url, category)')
           .eq('user_id', profile.id);
         if (error) throw error;
-        setMemberships((data as ClubMembership[]) || []);
+        // clubs는 객체(단일)로 반환되므로 타입 보정
+        interface ClubMemberRow {
+          role: string;
+          clubs: ClubMembership['clubs'] | ClubMembership['clubs'][];
+        }
+        const normalized = ((data ?? []) as ClubMemberRow[]).map((row) => ({
+          role:  row.role,
+          clubs: Array.isArray(row.clubs) ? row.clubs[0] ?? null : row.clubs,
+        }));
+        setMemberships(normalized as ClubMembership[]);
       } catch (err) {
         console.warn('[Profile] members fetch 실패 — 폴백 사용:', err);
         if (profile.univ_name) {

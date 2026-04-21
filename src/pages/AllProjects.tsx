@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   ChevronRight, Search, Flame,
-  Eye, Clock, CheckCircle2, XCircle, Layers, Zap,
+  Eye, Clock, CheckCircle2, XCircle, Layers, Zap, Loader2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -53,48 +53,6 @@ function StatusBadge({ status, isAdmin }: { status: Project['status']; isAdmin: 
 }
 
 /* ══════════════════════════════════════════
-   Mock fallback
-══════════════════════════════════════════ */
-const MOCK: Project[] = [
-  {
-    id: '1', title: 'Club DX 메인 앱 개발', description: '동아리 멤버 관리, 출석 체크, 일정 공유 등을 하나로 통합한 올인원 동아리 앱.',
-    status: 'active', views: 1240, tech_stack: ['React', 'TypeScript', 'Supabase', 'Tailwind CSS'],
-    member_count: 6, created_at: '2026-03-01', clubName: 'Club DX 개발팀',
-    participants: [{ name: '김철수' }, { name: '이영희' }, { name: '박민준' }, { name: '최지은' }],
-  },
-  {
-    id: '2', title: '브랜딩 리뉴얼 프로젝트', description: '동아리 전체 비주얼 아이덴티티(VI) 재정립 프로젝트.',
-    status: 'closed', views: 873, tech_stack: ['Figma', 'Adobe Illustrator', 'After Effects'],
-    member_count: 4, created_at: '2026-01-15', clubName: '크리에이티브 디자인',
-    participants: [{ name: '윤서연' }, { name: '한소희' }],
-  },
-  {
-    id: '3', title: '신입 온보딩 자동화', description: '신입 부원 환영 키트 자동 발송, 멘토 매칭, OT 일정 안내를 자동화하는 봇 시스템.',
-    status: 'draft', views: 542, tech_stack: ['Python', 'Slack API', 'Google Sheets'],
-    member_count: 3, created_at: '2026-02-10', clubName: '마케팅 보이즈',
-    participants: [{ name: '정현우' }],
-  },
-  {
-    id: '4', title: '캠퍼스 마케팅 캠페인', description: '교내 스타트업과 협업한 SNS 바이럴 마케팅 캠페인.',
-    status: 'active', views: 410, tech_stack: ['Canva', 'Meta Ads', 'Google Analytics'],
-    member_count: 5, created_at: '2026-02-20', clubName: '마케팅 보이즈',
-    participants: [{ name: '이수진' }, { name: '김도원' }],
-  },
-  {
-    id: '5', title: '인디 게임 "스페이스 리프트"', description: '2D 픽셀 아트 기반 우주 탈출 게임. 글로벌 게임잼 72시간 챌린지 출품작.',
-    status: 'closed', views: 690, tech_stack: ['Unity', 'C#', 'Aseprite', 'FMOD'],
-    member_count: 7, created_at: '2025-12-01', clubName: '게임 크리에이터',
-    participants: [{ name: '박준혁' }, { name: '오지민' }, { name: '강태경' }],
-  },
-  {
-    id: '6', title: '알고리즘 문제 풀이 플랫폼', description: '스터디원끼리 풀이를 공유하고 리뷰하는 코드 리뷰 전용 플랫폼.',
-    status: 'active', views: 320, tech_stack: ['Next.js', 'PostgreSQL', 'Judge0 API'],
-    member_count: 4, created_at: '2026-03-05', clubName: '알고리즘 스터디',
-    participants: [{ name: '한지원' }, { name: '최민서' }],
-  },
-];
-
-/* ══════════════════════════════════════════
    Mask name
 ══════════════════════════════════════════ */
 const mask = (name: string) => name.length > 0 ? name[0] + 'ㅇㅇ' : '멤버';
@@ -122,20 +80,32 @@ export function AllProjects() {
   const navigate = useNavigate();
   const { isAdminMode } = useAuth();
 
-  const [projects, setProjects] = useState<Project[]>(MOCK);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading,  setLoading]  = useState(true);
   const [query,    setQuery]    = useState('');
   const [sort,     setSort]     = useState<SortKey>('views');
   const [filter,   setFilter]   = useState<StatusFilter>('전체');
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
         const { data, error } = await supabase
           .from('projects')
           .select('id, title, description, status, views, tech_stack, member_count, created_at, clubs(id, name)');
-        if (!error && data && data.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setProjects(data.map((p: any) => ({
+        interface ProjectRow {
+          id: string | number;
+          title: string | null;
+          description: string | null;
+          status: string | null;
+          views: number | null;
+          tech_stack: string[] | null;
+          member_count: number | null;
+          created_at: string | null;
+          clubs: { id: string; name: string } | { id: string; name: string }[] | null;
+        }
+        if (!error && data) {
+          setProjects((data as ProjectRow[]).map((p) => ({
             id:           String(p.id),
             title:        p.title        ?? '제목 없음',
             description:  p.description  ?? '',
@@ -148,7 +118,9 @@ export function AllProjects() {
             participants: [],
           })));
         }
-      } catch { /* mock 유지 */ }
+      } catch { /* 빈 목록 유지 */ } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -276,10 +248,17 @@ export function AllProjects() {
         <p className={`text-xs font-bold ${textDim} px-1`}>{filtered.length}개의 프로젝트</p>
 
         {/* ── 카드 리스트 ── */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24 gap-3">
+            <Loader2 className={`w-6 h-6 animate-spin ${textMuted}`} />
+            <span className={`text-sm font-black ${textMuted}`}>불러오는 중...</span>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className={`${cardBg} rounded-3xl border ${cardBorder} py-16 text-center`}>
-            <p className="text-3xl mb-3">🔍</p>
-            <p className={`${textPri} font-bold text-sm`}>검색 결과가 없습니다</p>
+            <p className="text-3xl mb-3">{query ? '🔍' : '📭'}</p>
+            <p className={`${textPri} font-bold text-sm`}>
+              {query ? '검색 결과가 없습니다' : '등록된 프로젝트가 없습니다'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">

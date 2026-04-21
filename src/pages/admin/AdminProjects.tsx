@@ -3,19 +3,42 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus, X, Paperclip, ChevronLeft, ChevronRight,
   Rocket, Clock, CheckCircle2, XCircle, Upload, Search,
-  Zap, Users, Hash,
+  Zap, Users, Hash, Calendar, ChevronDown, Loader2,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth,
          eachDayOfInterval, isSameMonth, isSameDay, isWithinInterval,
          startOfWeek, endOfWeek } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { BackButton } from '../../components/common/BackButton';
 import { EmptyState } from '../../components/common/EmptyState';
 
 /* ══════════════════════════════════════════
    타입
 ══════════════════════════════════════════ */
+interface Member {
+  id: string;
+  full_name: string;
+  role?: string;
+  avatar_url?: string;
+}
+
+interface Team {
+  id: string;
+  name: string;
+  leaderId: string;
+  memberIds: string[];
+}
+
+interface ScheduleItem {
+  id: string;
+  title: string;
+  date: string;
+  type?: string;
+}
+
 interface Project {
   id: string;
   title: string;
@@ -30,13 +53,8 @@ interface Project {
   techStack: string[];
   tags: string[];
   created_at: string;
-}
-
-interface Member {
-  id: string;
-  full_name: string;
-  role?: string;
-  avatar_url?: string;
+  relatedScheduleIds?: string[];
+  teams?: Team[];
 }
 
 /* ══════════════════════════════════════════
@@ -130,7 +148,7 @@ function StatusBadge({ status }: { status: Project['status'] }) {
 /* ══════════════════════════════════════════
    참가자 아바타
 ══════════════════════════════════════════ */
-function Avatar({ member, size = 'sm' }: { member: Member; size?: 'sm' | 'md' }) {
+const Avatar: React.FC<{ member: Member; size?: 'sm' | 'md' }> = ({ member, size = 'sm' }) => {
   const s = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs';
   return (
     <div className={`${s} rounded-full bg-black text-white font-bold flex items-center justify-center shrink-0 border-2 border-white overflow-hidden`}>
@@ -140,17 +158,18 @@ function Avatar({ member, size = 'sm' }: { member: Member; size?: 'sm' | 'md' })
       }
     </div>
   );
-}
+};
 
 /* ══════════════════════════════════════════
    새 프로젝트 모달
 ══════════════════════════════════════════ */
 function CreateModal({
-  open, onClose, onSubmit, isSubmitting,
+  open, onClose, onSubmit, isSubmitting, clubId,
 }: {
   open: boolean; onClose: () => void;
   onSubmit: (data: Omit<Project, 'id' | 'created_at'>) => void;
   isSubmitting: boolean;
+  clubId: string | null;
 }) {
   /* 폼 상태 */
   const [title,        setTitle]        = useState('');
@@ -170,50 +189,105 @@ function CreateModal({
   const [attachments,  setAttachments]  = useState<File[]>([]);
 
   /* 팀원 */
-  const [allMembers,      setAllMembers]      = useState<Member[]>([]);
-  const [memberQuery,     setMemberQuery]     = useState('');
-  const [selectedMembers, setSelectedMembers] = useState<Member[]>([]);
+  const [allMembers,       setAllMembers]       = useState<Member[]>([]);
+  const [memberQuery,      setMemberQuery]      = useState('');
+  const [selectedMembers,  setSelectedMembers]  = useState<Member[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
+
+  /* 관련 일정 */
+  const [allSchedules,       setAllSchedules]       = useState<ScheduleItem[]>([]);
+  const [relatedScheduleIds, setRelatedScheduleIds] = useState<string[]>([]);
+  const [schedulesLoading,   setSchedulesLoading]   = useState(false);
+  const [scheduleSearch,     setScheduleSearch]     = useState('');
+  const [scheduleOpen,       setScheduleOpen]       = useState(true);
+
+  /* 팀 구성 */
+  const [teams,             setTeams]             = useState<Team[]>([]);
+  const [teamMemberSearch,  setTeamMemberSearch]  = useState<Record<string, string>>({});
+  const [teamMemberOpen,    setTeamMemberOpen]    = useState<Record<string, boolean>>({});
 
   const thumbRef  = useRef<HTMLInputElement>(null);
   const attachRef = useRef<HTMLInputElement>(null);
 
-  const parsedTags  = tagsInput.split(/[,#\s]+/).map(t => t.trim()).filter(Boolean);
-  const parsedTech  = techStack;
+  const parsedTags = tagsInput.split(/[,#\s]+/).map(t => t.trim()).filter(Boolean);
 
+  /* ── 멤버 로드 ── */
   const fetchMembers = useCallback(async () => {
     setIsMembersLoading(true);
     try {
+      if (clubId) {
+        const { data } = await supabase
+          .from('club_members')
+          .select('user_id, profiles(id, full_name, role, avatar_url)')
+          .eq('club_id', clubId);
+        interface MemberJoinRow { profiles: Member | Member[] | null; }
+        if (data && data.length > 0) {
+          const members = (data as MemberJoinRow[]).map((d) => {
+            const p = d.profiles;
+            return Array.isArray(p) ? p[0] : p;
+          }).filter((p): p is Member => p != null);
+          setAllMembers(members);
+          return;
+        }
+      }
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, role, avatar_url')
         .order('full_name');
       if (!error && data) setAllMembers(data as Member[]);
-      else setAllMembers([
-        { id: 'demo1', full_name: '김철수', role: 'ADMIN' },
-        { id: 'demo2', full_name: '이영희', role: 'MEMBER' },
-        { id: 'demo3', full_name: '박민준', role: 'MEMBER' },
-      ]);
     } catch {
-      setAllMembers([
-        { id: 'demo1', full_name: '김철수', role: 'ADMIN' },
-        { id: 'demo2', full_name: '이영희', role: 'MEMBER' },
-        { id: 'demo3', full_name: '박민준', role: 'MEMBER' },
-      ]);
+      /* 빈 목록 유지 */
     } finally {
       setIsMembersLoading(false);
     }
-  }, []);
+  }, [clubId]);
+
+  /* ── 일정 로드 ── */
+  const fetchSchedules = useCallback(async () => {
+    if (!clubId) return;
+    setSchedulesLoading(true);
+    try {
+      const { data } = await supabase
+        .from('schedules')
+        .select('id, title, date, type')
+        .eq('club_id', clubId)
+        .order('date', { ascending: false })
+        .limit(60);
+      setAllSchedules(data ?? []);
+    } catch { /* silent */ } finally {
+      setSchedulesLoading(false);
+    }
+  }, [clubId]);
 
   useEffect(() => {
-    if (open) { fetchMembers(); document.body.style.overflow = 'hidden'; }
-    else       { document.body.style.overflow = ''; }
+    if (open) {
+      fetchMembers();
+      fetchSchedules();
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
     return () => { document.body.style.overflow = ''; };
-  }, [open, fetchMembers]);
+  }, [open, fetchMembers, fetchSchedules]);
 
   const filteredMembers = allMembers.filter(m =>
     m.full_name.includes(memberQuery) && !selectedMembers.some(s => s.id === m.id),
   );
+
+  const filteredSchedules = allSchedules.filter(s =>
+    s.title.toLowerCase().includes(scheduleSearch.toLowerCase()),
+  );
+
+  /* 오늘 기준 가까운 순 정렬 → 다가오는 5개 우선, 부족하면 지난 일정으로 채움 */
+  const _todayStr = new Date().toISOString().slice(0, 10);
+  const _upcoming = [...allSchedules]
+    .filter(s => s.date >= _todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const _past = [...allSchedules]
+    .filter(s => s.date < _todayStr)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const recentSchedules = [..._upcoming, ..._past].slice(0, 5);
+  const displaySchedules = scheduleSearch.trim() ? filteredSchedules : recentSchedules;
 
   const reset = () => {
     setTitle(''); setEmoji('📱'); setShowEmoji(false);
@@ -222,6 +296,8 @@ function CreateModal({
     setTechInput(''); setTechStack([]); setTagsInput('');
     setThumbnail(null); setThumbPreview(null); setAttachments([]);
     setSelectedMembers([]); setMemberQuery('');
+    setRelatedScheduleIds([]); setScheduleSearch(''); setScheduleOpen(true);
+    setTeams([]); setTeamMemberSearch({}); setTeamMemberOpen({});
   };
 
   const handleClose = () => { onClose(); reset(); };
@@ -244,6 +320,27 @@ function CreateModal({
     setTechInput('');
   };
 
+  /* ── 팀 관련 헬퍼 ── */
+  const addTeam = () => {
+    const id = crypto.randomUUID();
+    setTeams(prev => [...prev, { id, name: '', leaderId: '', memberIds: [] }]);
+  };
+  const removeTeam = (idx: number) => setTeams(prev => prev.filter((_, i) => i !== idx));
+  const updateTeam = (idx: number, updates: Partial<Team>) =>
+    setTeams(prev => prev.map((t, i) => i === idx ? { ...t, ...updates } : t));
+  const toggleTeamMember = (idx: number, memberId: string) =>
+    setTeams(prev => prev.map((t, i) => {
+      if (i !== idx) return t;
+      const has = t.memberIds.includes(memberId);
+      return { ...t, memberIds: has ? t.memberIds.filter(id => id !== memberId) : [...t.memberIds, memberId] };
+    }));
+
+  /* ── 일정 체크박스 토글 ── */
+  const toggleSchedule = (id: string) =>
+    setRelatedScheduleIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
+    );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !description || !detail || !startDate || selectedMembers.length < 2) return;
@@ -253,8 +350,10 @@ function CreateModal({
       end_date:   endDate ? format(endDate, 'yyyy-MM-dd') : '',
       thumbnail_url: thumbPreview ?? undefined,
       participants: selectedMembers,
-      techStack: parsedTech,
+      techStack,
       tags: parsedTags,
+      relatedScheduleIds,
+      teams,
     });
     reset();
   };
@@ -277,10 +376,10 @@ function CreateModal({
           </button>
         </div>
 
-        {/* 본문 (분할) */}
+        {/* 본문 */}
         <form onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
 
-          {/* ── 왼쪽: 입력 폼 ── */}
+          {/* ── 입력 폼 ── */}
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
             {/* 제목 정보 */}
@@ -382,7 +481,7 @@ function CreateModal({
               <div className="relative mb-2">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/40" />
                 <input type="text" value={memberQuery} onChange={e => setMemberQuery(e.target.value)}
-                  placeholder="이름으로 검색 (미리보기에서 마스킹 처리됨)"
+                  placeholder="이름으로 검색"
                   className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-black/5 text-black placeholder:text-black/30 text-sm font-medium outline-none focus:bg-black/8 transition-colors"
                 />
               </div>
@@ -404,6 +503,294 @@ function CreateModal({
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* ── 관련 일정 ── */}
+            <div>
+              {/* 헤더 토글 버튼 */}
+              <button
+                type="button"
+                onClick={() => setScheduleOpen(p => !p)}
+                className="w-full flex items-center justify-between mb-3 group"
+              >
+                <div className="flex items-center gap-2">
+                  <p className="text-[11px] font-black text-black/40 uppercase tracking-widest">관련 일정</p>
+                  {relatedScheduleIds.length > 0 && (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-black text-white">
+                      {relatedScheduleIds.length}개 선택
+                    </span>
+                  )}
+                </div>
+                <ChevronDown
+                  size={14}
+                  className={`text-black/30 transition-transform duration-200 ${scheduleOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              <AnimatePresence initial={false}>
+                {scheduleOpen && (
+                  <motion.div
+                    key="schedule-panel"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-2 pb-1">
+                      {/* 검색 입력 */}
+                      <div className="relative">
+                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={scheduleSearch}
+                          onChange={e => setScheduleSearch(e.target.value)}
+                          placeholder="일정 검색..."
+                          className="w-full pl-8 pr-8 py-2 rounded-xl bg-black/5 text-black placeholder:text-black/30 text-sm font-medium outline-none focus:bg-black/8 transition-colors"
+                        />
+                        {scheduleSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setScheduleSearch('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-black/30 hover:text-black text-base leading-none"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 일정 목록 패널 */}
+                      {schedulesLoading ? (
+                        <p className="text-xs text-black/30 text-center py-4">불러오는 중...</p>
+                      ) : (
+                        <div className="rounded-2xl border border-black/8 overflow-hidden">
+                          {/* 라벨 행 */}
+                          <div className="px-4 py-2 bg-black/3 border-b border-black/6 flex items-center justify-between">
+                            <p className="text-[10px] font-black text-black/30 uppercase tracking-widest">
+                              {scheduleSearch.trim()
+                                ? `검색 결과 ${filteredSchedules.length}건`
+                                : `최근 일정 ${recentSchedules.length}개`}
+                            </p>
+                            {!scheduleSearch && allSchedules.length > 5 && (
+                              <p className="text-[10px] text-black/25 font-medium">
+                                검색으로 더 찾기 ({allSchedules.length}개 전체)
+                              </p>
+                            )}
+                          </div>
+
+                          {/* 스크롤 목록 */}
+                          <div className="max-h-52 overflow-y-auto overscroll-contain">
+                            {displaySchedules.length === 0 ? (
+                              <p className="text-xs text-black/30 text-center py-5">
+                                {scheduleSearch ? '검색 결과가 없습니다' : '등록된 일정이 없습니다'}
+                              </p>
+                            ) : (
+                              displaySchedules.map(s => {
+                                const checked = relatedScheduleIds.includes(s.id);
+                                const dateStr = s.date
+                                  ? (() => {
+                                      const d = new Date(s.date + 'T00:00:00');
+                                      return `${d.getMonth() + 1}/${d.getDate()}`;
+                                    })()
+                                  : '';
+                                const isPastItem = s.date < _todayStr;
+                                return (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => toggleSchedule(s.id)}
+                                    className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-black/5 transition-colors text-left border-b border-black/5 last:border-0
+                                      ${checked ? 'bg-black/[0.04]' : ''}`}
+                                  >
+                                    {/* 체크박스 */}
+                                    <div className={`w-4 h-4 rounded-[5px] border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                      checked ? 'bg-black border-black' : 'border-black/25'
+                                    }`}>
+                                      {checked && (
+                                        <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                          <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                      )}
+                                    </div>
+                                    <Calendar size={13} className={`shrink-0 ${isPastItem ? 'text-black/20' : 'text-black/40'}`} />
+                                    <span className={`text-sm font-bold flex-1 truncate ${isPastItem ? 'text-black/40' : 'text-black'}`}>
+                                      {s.title}
+                                    </span>
+                                    <span className={`text-[11px] font-medium shrink-0 ${isPastItem ? 'text-black/20' : 'text-black/40'}`}>
+                                      {dateStr}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* ── 팀 구성 ── */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[11px] font-black text-black/40 uppercase tracking-widest">팀 구성</p>
+                  {teams.length > 0 && (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-black/8 text-black/60">
+                      {teams.length}팀
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={addTeam}
+                  className="flex items-center gap-1.5 text-xs font-black text-black px-3 py-1.5 rounded-xl bg-black/5 hover:bg-black/10 transition-colors"
+                >
+                  <Plus size={12} /> 팀 추가
+                </button>
+              </div>
+
+              {teams.length === 0 && (
+                <p className="text-xs text-black/30 font-medium text-center py-3 bg-black/3 rounded-2xl">
+                  팀을 추가해 프로젝트 내 팀 구성을 관리하세요
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {teams.map((team, ti) => {
+                  const searchKey = team.id;
+                  const search = teamMemberSearch[searchKey] ?? '';
+                  const isOpen = teamMemberOpen[searchKey] ?? false;
+                  const leaderMember = allMembers.find(m => m.id === team.leaderId);
+                  const teamMembers = allMembers.filter(m => team.memberIds.includes(m.id));
+                  const filteredForTeam = allMembers.filter(m =>
+                    m.full_name.includes(search) && m.id !== team.leaderId,
+                  );
+
+                  return (
+                    <div key={team.id} className="border border-black/10 rounded-2xl p-4 space-y-3 bg-white">
+                      {/* 팀 이름 + 삭제 */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={team.name}
+                          onChange={e => updateTeam(ti, { name: e.target.value })}
+                          placeholder="팀 이름 (예: 기획팀, 개발팀)"
+                          className="flex-1 px-3 py-2 rounded-xl bg-black/5 text-sm font-bold text-black placeholder:text-black/30 outline-none focus:bg-black/8 transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeTeam(ti)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-black/30 hover:text-red-500 transition-colors shrink-0"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      {/* 팀장 선택 */}
+                      <div>
+                        <p className="text-[10px] font-black text-black/40 mb-1.5">팀장</p>
+                        {leaderMember ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black text-white">
+                            <Avatar member={leaderMember} size="sm" />
+                            <span className="text-sm font-bold flex-1">{leaderMember.full_name}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateTeam(ti, { leaderId: '' })}
+                              className="text-white/50 hover:text-white"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <select
+                            value={team.leaderId}
+                            onChange={e => updateTeam(ti, { leaderId: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl bg-black/5 text-sm font-bold text-black outline-none focus:bg-black/8 transition-colors cursor-pointer"
+                          >
+                            <option value="">팀장을 선택하세요</option>
+                            {allMembers.map(m => (
+                              <option key={m.id} value={m.id}>{m.full_name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* 팀원 선택 */}
+                      <div>
+                        <p className="text-[10px] font-black text-black/40 mb-1.5">
+                          팀원
+                          {teamMembers.length > 0 && (
+                            <span className="ml-1.5 text-black/50">{teamMembers.length}명</span>
+                          )}
+                        </p>
+                        {teamMembers.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {teamMembers.map(m => (
+                              <span
+                                key={m.id}
+                                className="inline-flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full bg-black/8 text-xs font-bold text-black"
+                              >
+                                <Avatar member={m} size="sm" />
+                                {m.full_name}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleTeamMember(ti, m.id)}
+                                  className="ml-0.5 text-black/30 hover:text-black"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="relative">
+                          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30" />
+                          <input
+                            type="text"
+                            value={search}
+                            onChange={e => {
+                              setTeamMemberSearch(prev => ({ ...prev, [searchKey]: e.target.value }));
+                              setTeamMemberOpen(prev => ({ ...prev, [searchKey]: true }));
+                            }}
+                            onFocus={() => setTeamMemberOpen(prev => ({ ...prev, [searchKey]: true }))}
+                            placeholder="팀원 이름 검색"
+                            className="w-full pl-8 pr-4 py-2 rounded-xl bg-black/5 text-sm font-bold text-black placeholder:text-black/30 outline-none focus:bg-black/8 transition-colors"
+                          />
+                        </div>
+                        {isOpen && search && (
+                          <div className="mt-1 rounded-xl bg-white border border-black/10 shadow-sm overflow-hidden max-h-28 overflow-y-auto">
+                            {filteredForTeam.length === 0 ? (
+                              <p className="text-xs text-black/30 text-center py-3">검색 결과 없음</p>
+                            ) : filteredForTeam.slice(0, 5).map(m => {
+                              const alreadyIn = team.memberIds.includes(m.id);
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => {
+                                    toggleTeamMember(ti, m.id);
+                                    setTeamMemberSearch(prev => ({ ...prev, [searchKey]: '' }));
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-black/5 transition-colors text-left"
+                                >
+                                  <Avatar member={m} size="sm" />
+                                  <span className="text-sm font-bold text-black flex-1">{m.full_name}</span>
+                                  {alreadyIn
+                                    ? <X size={12} className="text-black/40" />
+                                    : <Plus size={12} className="text-black/30" />
+                                  }
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* 프로젝트 기간 */}
@@ -519,7 +906,7 @@ function CreateModal({
             </div>
 
             {/* 첨부파일 */}
-            <div>
+            <div className="pb-2">
               <p className="text-[11px] font-black text-black/40 uppercase tracking-widest mb-3">관련 첨부파일</p>
               <button type="button" onClick={() => attachRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-black/5 text-sm font-bold text-black/50 hover:bg-black/10 hover:text-black transition-colors">
@@ -575,58 +962,94 @@ function CreateModal({
 ══════════════════════════════════════════ */
 export function AdminProjects() {
   const navigate = useNavigate();
+  const { activeClubId } = useAuth();
+  const clubId = activeClubId;   // context에서 직접 — 동아리별 독립 보장
 
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: '1', emoji: '💻', title: 'Club DX 메인 앱 개발',
-      description: '동아리 관리 올인원 앱을 자체 개발합니다.',
-      detail: '매 기수마다 반복되는 신입 부원 안내 메시지, 자료 배포, OT 일정 공유 등의 작업을 자동화하는 프로젝트입니다.\n\nSlack Bot + Notion API + Supabase를 연동해 구현할 예정입니다.',
-      start_date: '2026-03-01', end_date: '2026-06-30', status: 'active',
-      participants: [
-        { id: 'a', full_name: '김철수' },
-        { id: 'b', full_name: '이영희' },
-        { id: 'c', full_name: '박민준' },
-      ],
-      techStack: ['React', 'TypeScript', 'Supabase'],
-      tags: ['CLUBDX', '메인앱개발', '개발'],
-      created_at: '2026-03-01',
-    },
-    {
-      id: '2', emoji: '🎨', title: '브랜딩 리뉴얼 프로젝트',
-      description: '동아리 BI/CI 아이덴티티를 새롭게 정의합니다.',
-      detail: '동아리의 시각적 아이덴티티를 전면 재정비합니다.',
-      start_date: '2026-01-15', end_date: '2026-02-28', status: 'closed',
-      participants: [{ id: 'b', full_name: '이영희' }],
-      techStack: ['Figma', 'Illustrator'],
-      tags: ['디자인', '브랜딩'],
-      created_at: '2026-01-15',
-    },
-    {
-      id: '3', emoji: '📣', title: '마케팅 보이즈',
-      description: '신입 온보딩 자동화 시스템 개발 프로젝트입니다.',
-      detail: '매 기수마다 반복되는 신입 부원 안내 메시지, 자료 배포, OT 일정 공유 등의 작업을 자동화하는 프로젝트입니다.\n\nSlack Bot + Notion API + Supabase를 연동해 구현할 예정입니다.',
-      start_date: '2026-04-01', end_date: '2026-09-30', status: 'draft',
-      participants: [{ id: 'a', full_name: '김철수' }],
-      techStack: ['Slack API', 'Notion API', 'Node.js', 'Automation'],
-      tags: ['마케팅', '자동화'],
-      created_at: '2026-03-15',
-    },
-  ]);
-
+  const [projects,    setProjects]    = useState<Project[]>([]);
+  const [isLoading,   setIsLoading]   = useState(true);
   const [isModalOpen,  setIsModalOpen]  = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /* 프로젝트 목록 로드 */
+  useEffect(() => {
+    if (!clubId) { setIsLoading(false); return; }
+    setIsLoading(true);
+    supabase.from('projects')
+      .select('id, title, emoji, description, detail, start_date, end_date, status, thumbnail_url, created_at')
+      .eq('club_id', clubId)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        interface ProjectRow {
+          id: string;
+          title: string;
+          emoji: string;
+          description: string;
+          detail: string;
+          start_date: string;
+          end_date: string;
+          status: 'active' | 'closed' | 'draft';
+          thumbnail_url?: string;
+          created_at: string;
+          tech_stack?: string[];
+          tags?: string[];
+        }
+        if (data) {
+          setProjects((data as ProjectRow[]).map((p) => ({
+            ...p,
+            techStack: p.tech_stack ?? [],
+            tags: p.tags ?? [],
+            participants: [],
+          })));
+        }
+        setIsLoading(false);
+      });
+  }, [clubId]);
 
   const handleCreate = async (data: Omit<Project, 'id' | 'created_at'>) => {
     setIsSubmitting(true);
     try {
-      let thumbnailUrl = data.thumbnail_url;
-      const newProject: Project = {
-        id:         crypto.randomUUID(),
-        ...data,
-        thumbnail_url: thumbnailUrl,
-        created_at: format(new Date(), 'yyyy-MM-dd'),
-      };
-      setProjects(prev => [newProject, ...prev]);
+      if (clubId) {
+        /* Supabase 저장 */
+        const { data: inserted, error } = await supabase.from('projects').insert({
+          club_id:       clubId,
+          title:         data.title,
+          emoji:         data.emoji,
+          description:   data.description,
+          detail:        data.detail,
+          status:        data.status,
+          start_date:    data.start_date,
+          end_date:      data.end_date || null,
+          thumbnail_url: data.thumbnail_url ?? null,
+          tech_stack:    data.techStack,
+          tags:          data.tags,
+        }).select('id').single();
+
+        if (error) throw error;
+
+        /* 확장 컬럼 저장 (없으면 무시) */
+        if (inserted?.id) {
+          await supabase.from('projects').update({
+            related_schedule_ids: data.relatedScheduleIds ?? [],
+            teams:                data.teams ?? [],
+          }).eq('id', inserted.id).then(() => {}); // silent fail if columns missing
+
+          /* 로컬 상태 업데이트 */
+          const newProject: Project = {
+            id: inserted.id,
+            ...data,
+            created_at: format(new Date(), 'yyyy-MM-dd'),
+          };
+          setProjects(prev => [newProject, ...prev]);
+        }
+      } else {
+        /* clubId 없을 때 로컬 전용 */
+        const newProject: Project = {
+          id: crypto.randomUUID(),
+          ...data,
+          created_at: format(new Date(), 'yyyy-MM-dd'),
+        };
+        setProjects(prev => [newProject, ...prev]);
+      }
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);
@@ -645,14 +1068,13 @@ export function AdminProjects() {
 
   return (
     <div className="bg-white min-h-screen pb-12">
-      <div className="max-w-5xl mx-auto px-4 pt-6 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 pt-16 space-y-6">
         <BackButton to="/admin" label="뒤로가기" />
 
         {/* 헤더 배너 */}
         <div className="relative overflow-hidden rounded-3xl border border-black/10 bg-white px-8 pt-8 pb-10">
           <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full border-[3px] border-black/5 pointer-events-none" />
           <div className="absolute -bottom-6 right-20 w-24 h-24 rounded-full border-[3px] border-black/5 pointer-events-none" />
-          <span className="inline-block text-[11px] font-black tracking-widest uppercase text-black/40 border border-black/15 rounded-full px-3 py-1 mb-3">PROJECT</span>
           <h1 className="text-4xl font-black text-black mb-1">🚀 프로젝트 관리</h1>
           <p className="text-sm text-black/50 font-medium mb-6">동아리 프로젝트를 등록하고 팀을 구성하세요.</p>
           {/* 통계 */}
@@ -681,57 +1103,69 @@ export function AdminProjects() {
 
         {/* 프로젝트 목록 */}
         <div className="space-y-3">
-          {projects.map(project => (
-            <div
-              key={project.id}
-              onClick={() => navigate(`/admin/projects/${project.id}`)}
-              className="bg-white rounded-3xl border border-black/10 hover:border-black/30 hover:-translate-y-0.5 p-5 flex gap-4 cursor-pointer transition-all"
-            >
-              {/* 아이콘/썸네일 */}
-              <div className="w-16 h-16 rounded-2xl bg-black/5 overflow-hidden shrink-0 flex items-center justify-center text-3xl">
-                {project.thumbnail_url
-                  ? <img src={project.thumbnail_url} alt="" className="w-full h-full object-cover" />
-                  : project.emoji
-                }
-              </div>
-              {/* 내용 */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <h3 className="font-black text-black truncate">{project.title}</h3>
-                  <StatusBadge status={project.status} />
+          {isLoading ? (
+            /* 로딩 스피너 */
+            <div className="bg-white rounded-3xl border border-black/10 py-20 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-black/30" />
+              <p className="text-sm font-bold text-black/40">프로젝트 불러오는 중...</p>
+            </div>
+          ) : projects.length === 0 ? (
+            /* Empty state */
+            <div className="bg-white rounded-3xl border border-black/10 py-20 flex flex-col items-center justify-center gap-3">
+              <Rocket className="w-10 h-10 text-black/20" />
+              <p className="text-sm font-bold text-black/40">등록된 프로젝트가 없습니다</p>
+              <p className="text-xs text-black/30">위의 버튼을 눌러 첫 프로젝트를 만들어보세요</p>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="mt-2 flex items-center gap-1.5 px-4 py-2 bg-black text-white text-sm font-bold rounded-full hover:bg-black/85 transition-colors"
+              >
+                <Plus size={14} /> 새 프로젝트 만들기
+              </button>
+            </div>
+          ) : (
+            projects.map(project => (
+              <div
+                key={project.id}
+                onClick={() => navigate(`/admin/projects/${project.id}`)}
+                className="bg-white rounded-3xl border border-black/10 hover:border-black/30 hover:-translate-y-0.5 p-5 flex gap-4 cursor-pointer transition-all"
+              >
+                {/* 아이콘/썸네일 */}
+                <div className="w-16 h-16 rounded-2xl bg-black/5 overflow-hidden shrink-0 flex items-center justify-center text-3xl">
+                  {project.thumbnail_url
+                    ? <img src={project.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                    : project.emoji
+                  }
                 </div>
-                <p className="text-sm text-black/50 font-medium line-clamp-1 mb-2">{project.description}</p>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-black/30 font-medium">
-                    {project.start_date} ~ {project.end_date || '미정'}
-                  </span>
-                  {project.participants.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <div className="flex -space-x-1.5">
-                        {project.participants.slice(0, 4).map(m => (
-                          <Avatar key={m.id} member={m} size="sm" />
-                        ))}
+                {/* 내용 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-black text-black truncate">{project.title}</h3>
+                    <StatusBadge status={project.status} />
+                  </div>
+                  <p className="text-sm text-black/50 font-medium line-clamp-1 mb-2">{project.description}</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-black/30 font-medium">
+                      {project.start_date} ~ {project.end_date || '미정'}
+                    </span>
+                    {project.participants.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <div className="flex -space-x-1.5">
+                          {project.participants.slice(0, 4).map(m => (
+                            <Avatar key={m.id} member={m} size="sm" />
+                          ))}
+                        </div>
+                        <span className="text-xs text-black/30 ml-1 font-medium">
+                          {project.participants.length}명
+                        </span>
                       </div>
-                      <span className="text-xs text-black/30 ml-1 font-medium">
-                        {project.participants.length}명
-                      </span>
-                    </div>
-                  )}
-                  {project.tags.slice(0, 2).map(t => (
-                    <span key={t} className="text-[11px] text-black/30 font-medium">#{t}</span>
-                  ))}
+                    )}
+                    {project.tags.slice(0, 2).map(t => (
+                      <span key={t} className="text-[11px] text-black/30 font-medium">#{t}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-
-          {projects.length === 0 && (
-            <div className="bg-white rounded-3xl border border-black/10">
-              <EmptyState
-                icon={<Rocket className="w-10 h-10 text-black/20" />}
-                message="등록된 프로젝트가 없습니다."
-              />
-            </div>
+            ))
           )}
         </div>
       </div>
@@ -741,6 +1175,7 @@ export function AdminProjects() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreate}
         isSubmitting={isSubmitting}
+        clubId={clubId}
       />
     </div>
   );

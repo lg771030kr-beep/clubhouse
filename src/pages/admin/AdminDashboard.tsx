@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
-  Users, UserCheck, FileWarning, QrCode,
+  QrCode,
   CalendarDays, ChevronDown, Check,
   X as XIcon, AlertCircle, CalendarPlus,
-  Flame, Eye, ChevronRight, Layers, Megaphone,
-  TrendingUp, TrendingDown, Minus,
+  ChevronRight, Clock, MapPin, Rocket, Tag, Loader2,
 } from 'lucide-react';
 import { AttendanceQR } from './AttendanceQR';
 import { ScheduleModal } from '../../components/admin/ScheduleModal';
+import { AdminClubWelcome } from './AdminClubWelcome';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 /* ── 모션 Variants ── */
 const fadeUp = {
@@ -20,7 +21,6 @@ const fadeUp = {
     transition: { delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] },
   }),
 };
-const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } };
 
 const Btn = ({
   children, className = '', onClick, type = 'button', disabled,
@@ -40,140 +40,230 @@ function todayYMD(): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
+interface UpcomingSchedule {
+  id: string;
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+  type: 'GENERAL' | 'ASSIGNMENT' | 'BOTH';
+}
+
 export function AdminDashboard() {
   const navigate = useNavigate();
+  const { profile, activeClubId, loading: authLoading } = useAuth();
   const [todaySchedules,      setTodaySchedules]      = useState<{ id: string; title: string; time: string | null }[]>([]);
   const [selectedScheduleId,  setSelectedScheduleId]  = useState<string>('');
   const [isQRModalOpen,       setIsQRModalOpen]       = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [pendingSchedules,    setPendingSchedules]    = useState<any[]>([]);
-  const [hotProjects,         setHotProjects]         = useState<{ id: string; title: string; views: number; status: string; emoji: string }[]>([
-    { id: '1', title: 'Club DX 메인 앱',   views: 1240, status: '진행중', emoji: '📱' },
-    { id: '2', title: '브랜딩 리뉴얼',     views: 873,  status: '완료',   emoji: '🎯' },
-    { id: '3', title: '신입 온보딩 자동화', views: 542,  status: '준비중', emoji: '🤖' },
-  ]);
-  const [popularClubs,        setPopularClubs]        = useState<{ id: string; name: string; field: string; members: number; emoji: string; pct: number }[]>([]);
-  const [clubsLoading,        setClubsLoading]        = useState(true);
+  const [pendingSchedules,    setPendingSchedules]    = useState<UpcomingSchedule[]>([]);
+
+  /* ── 동아리 정보 ── */
+  const [clubId,       setClubId]       = useState<string | null>(null);
+  const [clubName,     setClubName]     = useState<string>('');
+  const [isNewClub,    setIsNewClub]    = useState<boolean | null>(null); // null = 아직 판단 전
+  const [isDeleted,    setIsDeleted]    = useState(false);
+  const [isRestoring,  setIsRestoring]  = useState(false);
 
   /* ── 실시간 메트릭 상태 ── */
-  const [totalMembers,      setTotalMembers]      = useState<number>(42);
-  const [todayAttendance,   setTodayAttendance]   = useState<number>(35);
-  const [pendingAssignCount,setPendingAssignCount] = useState<number>(5);
+  const [totalMembers,      setTotalMembers]      = useState<number>(0);
+  const [todayAttendance,   setTodayAttendance]   = useState<number>(0);
+  const [pendingAssignCount,setPendingAssignCount] = useState<number>(0);
   const [metricsLoading,    setMetricsLoading]    = useState(true);
 
+  /* ── 다가오는 일정 미리보기 ── */
+  const [upcomingSchedules,  setUpcomingSchedules]  = useState<UpcomingSchedule[]>([]);
+  const [upcomingAssignment, setUpcomingAssignment] = useState<UpcomingSchedule | null>(null);
+  const [upcomingLoading,    setUpcomingLoading]    = useState(true);
+
+  /* ── 프로젝트 목록 ── */
+  const [projects,        setProjects]        = useState<{ id: string; title: string; emoji: string; status: string }[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+
+  /* activeClubId가 바뀔 때마다 모든 데이터 재조회 */
   useEffect(() => {
-    fetchPendingSchedules();
-    fetchTodaySchedules();
-    fetchHotProjects();
-    fetchMetrics();
-    fetchPopularClubs();
-  }, []);
+    // 아직 auth 로딩 중이면 대기 (activeClubId가 아직 null일 수 있음)
+    if (authLoading) return;
+
+    if (!activeClubId) {
+      // auth 완료됐는데 clubId 없음 → 진짜 새 관리자
+      setIsNewClub(true);
+      setMetricsLoading(false);
+      return;
+    }
+    // Promise.all로 병렬 fetch — 순차 호출 대비 렌더 지연 최소화
+    Promise.all([
+      fetchMetrics(),
+      fetchTodaySchedules(),
+      fetchPendingSchedules(),
+      fetchUpcoming(),
+      fetchProjects(),
+    ]);
+  }, [activeClubId, authLoading]);
 
   /* ── 실시간 메트릭 fetch ── */
   const fetchMetrics = async () => {
     setMetricsLoading(true);
     const today = todayYMD();
     try {
+      const cId = activeClubId;
+      if (!cId) {
+        setTotalMembers(0);
+        setTodayAttendance(0);
+        setPendingAssignCount(0);
+        setIsNewClub(true);
+        return;
+      }
+      setClubId(cId);
+
+      // 동아리 이름 + 삭제 여부 조회
+      const { data: clubData } = await supabase
+        .from('clubs').select('name, deleted_at').eq('id', cId).maybeSingle();
+      const cd = clubData as { name: string | null; deleted_at: string | null } | null;
+      setClubName(cd?.name ?? '');
+      setIsDeleted(!!cd?.deleted_at);
+
+      // 삭제된 동아리면 메트릭 조회 생략
+      if (cd?.deleted_at) {
+        setIsNewClub(false);
+        return;
+      }
+
       // 1. 총 부원 수
       const { count: mc } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-      if (mc !== null) setTotalMembers(mc);
+        .from('club_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('club_id', cId);
+      const memberCount = mc ?? 0;
+      setTotalMembers(memberCount);
 
       // 2. 오늘 출석 수
-      const { count: ac } = await supabase
-        .from('attendance')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'PRESENT')
-        .gte('marked_at', `${today}T00:00:00.000Z`)
-        .lte('marked_at', `${today}T23:59:59.999Z`);
-      if (ac !== null) setTodayAttendance(ac);
-
-      // 3. 미제출 과제 수 (assignments 테이블 우선 → schedules fallback)
-      try {
-        const { count: asgC, error: asgErr } = await supabase
-          .from('assignments')
+      // ★ marked_at 날짜 범위 대신 today의 schedule_id를 경유
+      //   (RLS 정책이 schedule_id → clubs.admin_id 기준이므로 이 방식이 안전)
+      const { data: todaySchRows } = await supabase
+        .from('schedules')
+        .select('id')
+        .eq('club_id', cId)
+        .eq('date', today);
+      const todaySchIds = (todaySchRows ?? []).map((r: { id: string }) => r.id).filter(Boolean);
+      if (todaySchIds.length > 0) {
+        const { count: ac } = await supabase
+          .from('attendance')
           .select('*', { count: 'exact', head: true })
-          .eq('is_active', true)
-          .gte('due_date', today);
-        if (!asgErr && asgC !== null) {
-          setPendingAssignCount(asgC);
-        } else {
-          throw new Error('assignments table not ready');
-        }
-      } catch {
-        // fallback: schedules.type='ASSIGNMENT' 중 오늘 이후 일정
-        const { count: schC } = await supabase
-          .from('schedules')
-          .select('*', { count: 'exact', head: true })
-          .eq('type', 'ASSIGNMENT')
-          .eq('is_approved', true)
-          .gte('date', today);
-        setPendingAssignCount(schC ?? 0);
+          .in('schedule_id', todaySchIds)
+          .eq('status', 'PRESENT');
+        setTodayAttendance(ac ?? 0);
+      } else {
+        setTodayAttendance(0);
       }
-    } catch { /* 초기값 유지 */ } finally {
+
+      // 3. 활성 과제 수 (이 동아리 것만)
+      const { count: schC } = await supabase
+        .from('schedules')
+        .select('*', { count: 'exact', head: true })
+        .in('type', ['ASSIGNMENT', 'BOTH'])
+        .eq('is_approved', true)
+        .gte('date', today)
+        .eq('club_id', cId);
+      setPendingAssignCount(schC ?? 0);
+
+      // 4. 이 동아리 일정 총 개수
+      const { count: totalSched } = await supabase
+        .from('schedules')
+        .select('*', { count: 'exact', head: true })
+        .eq('club_id', cId);
+
+      // 규칙 3: 일정이 하나도 없으면 관리자 welcome 페이지
+      // (동아리를 막 만들었거나 아직 일정/과제를 등록하지 않은 상태)
+      const isEmpty = (totalSched ?? 0) === 0;
+      setIsNewClub(isEmpty);
+
+    } catch {
+      setTotalMembers(0);
+      setTodayAttendance(0);
+      setPendingAssignCount(0);
+      setIsNewClub(false);
+    } finally {
       setMetricsLoading(false);
     }
   };
 
+  /* ── 다가오는 일정 fetch ── */
+  const fetchUpcoming = async () => {
+    setUpcomingLoading(true);
+    const today = todayYMD();
+    const cId = activeClubId;   // 로컬 state(clubId)는 비동기 set → activeClubId 직접 사용
+    try {
+      // 일반 일정 2개 (이 동아리 것만)
+      const { data: general } = cId ? await supabase
+        .from('schedules')
+        .select('id, title, date, time, location, type')
+        .in('type', ['GENERAL', 'BOTH'])
+        .eq('club_id', cId)
+        .gte('date', today)
+        .order('date', { ascending: true })
+        .order('time', { ascending: true })
+        .limit(2) : { data: [] };
+
+      // 과제 1개 (이 동아리 것만)
+      const { data: assignment } = cId ? await supabase
+        .from('schedules')
+        .select('id, title, date, time, location, type')
+        .in('type', ['ASSIGNMENT', 'BOTH'])
+        .eq('club_id', cId)
+        .gte('date', today)
+        .order('date', { ascending: true })
+        .order('time', { ascending: true })
+        .limit(1) : { data: [] };
+
+      setUpcomingSchedules((general ?? []) as UpcomingSchedule[]);
+      setUpcomingAssignment((assignment ?? [])[0] as UpcomingSchedule ?? null);
+    } catch {
+      setUpcomingSchedules([]);
+      setUpcomingAssignment(null);
+    } finally {
+      setUpcomingLoading(false);
+    }
+  };
+
+  const fetchProjects = async () => {
+    const cId = activeClubId;
+    if (!cId) { setProjectsLoading(false); return; }
+    setProjectsLoading(true);
+    try {
+      const { data } = await supabase
+        .from('projects')
+        .select('id, title, emoji, status')
+        .eq('club_id', cId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      setProjects(data ?? []);
+    } catch {
+      setProjects([]);
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
   const fetchTodaySchedules = async () => {
+    if (!activeClubId) return;
     const today = todayYMD();
     const { data } = await supabase.from('schedules').select('id, title, time')
-      .eq('is_approved', true).eq('date', today).order('time');
+      .eq('is_approved', true).eq('date', today)
+      .eq('club_id', activeClubId)
+      .order('time');
     const list = data ?? [];
     setTodaySchedules(list);
     if (list.length > 0) setSelectedScheduleId(list[0].id);
   };
 
-  const fetchHotProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, title, views, status')
-        .order('views', { ascending: false })
-        .limit(3);
-      if (!error && data && data.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setHotProjects(data.map((p: any) => ({
-          id:     String(p.id),
-          title:  p.title  ?? '프로젝트',
-          views:  p.views  ?? 0,
-          status: p.status === 'active' ? '진행중' : p.status === 'closed' ? '완료' : '준비중',
-          emoji:  '📁',
-        })));
-      }
-    } catch { /* mock 유지 */ }
-  };
-
-  /* ── 인기 동아리 실시간 fetch ── */
-  const fetchPopularClubs = async () => {
-    setClubsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('clubs')
-        .select('id, name, category, member_count')
-        .order('member_count', { ascending: false })
-        .limit(3);
-      if (!error && data && data.length > 0) {
-        const maxCount = (data[0] as any).member_count ?? 1;
-        setPopularClubs(data.map((c: any) => ({
-          id:      String(c.id),
-          name:    c.name          ?? '동아리',
-          field:   c.category      ?? '기타',
-          members: c.member_count  ?? 0,
-          emoji:   '🏢',
-          pct:     maxCount > 0 ? Math.round(((c.member_count ?? 0) / maxCount) * 100) : 0,
-        })));
-      }
-    } catch { /* 빈 상태 표시 */ } finally {
-      setClubsLoading(false);
-    }
-  };
-
   const fetchPendingSchedules = async () => {
+    if (!activeClubId) return;
     try {
       const { data, error } = await supabase.from('schedules').select('*')
-        .eq('is_approved', false).order('created_at', { ascending: false });
+        .eq('is_approved', false)
+        .eq('club_id', activeClubId)
+        .order('created_at', { ascending: false });
       if (!error && data) setPendingSchedules(data);
     } catch (err) { console.error(err); }
   };
@@ -183,6 +273,8 @@ export function AdminDashboard() {
       const { error } = await supabase.from('schedules').update({ is_approved: true }).eq('id', id);
       if (error) throw error;
       setPendingSchedules(prev => prev.filter(s => s.id !== id));
+      fetchUpcoming(); // 승인 후 미리보기 갱신
+      fetchMetrics();
     } catch { alert('승인 중 오류가 발생했습니다.'); }
   };
 
@@ -195,40 +287,95 @@ export function AdminDashboard() {
     } catch { alert('반려 중 오류가 발생했습니다.'); }
   };
 
-  /* 메트릭 카드 데이터 */
-  const metrics = [
-    {
-      label: '총 부원',
-      value: 42,
-      unit: '명',
-      trend: +3,
-      trendLabel: '지난달 대비',
-      icon: Users,
-      accentColor: '#000000',
-      to: '/admin/members',
-    },
-    {
-      label: '오늘 출석',
-      value: 35,
-      unit: '명',
-      trend: +2,
-      trendLabel: '어제 대비',
-      icon: UserCheck,
-      accentColor: '#000000',
-      attendanceRate: 83,
-      to: '/admin/attendance',
-    },
-    {
-      label: '미제출 과제',
-      value: 5,
-      unit: '건',
-      trend: -2,
-      trendLabel: '어제 대비',
-      icon: FileWarning,
-      accentColor: '#000000',
-      to: '/admin/assignments',
-    },
-  ];
+  /* ── 날짜 포맷 ── */
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const month = d.getMonth() + 1;
+    const day   = d.getDate();
+    const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
+    const dow = weekDays[d.getDay()];
+    const today = todayYMD();
+    if (dateStr === today) return `오늘 (${dow})`;
+    return `${month}월 ${day}일 (${dow})`;
+  };
+
+  const hasUpcoming = upcomingSchedules.length > 0 || upcomingAssignment !== null;
+
+  /* 판단 전 (메트릭 로딩 중) */
+  if (isNewClub === null && metricsLoading) return null;
+
+  /* ── 삭제된 동아리 → 복구 화면 ── */
+  if (isDeleted && clubId) {
+    const handleRestore = async () => {
+      setIsRestoring(true);
+      try {
+        const { error } = await supabase
+          .from('clubs')
+          .update({ deleted_at: null })
+          .eq('id', clubId);
+        if (error) throw error;
+        setIsDeleted(false);
+        Promise.all([
+          fetchMetrics(),
+          fetchTodaySchedules(),
+          fetchPendingSchedules(),
+          fetchUpcoming(),
+          fetchProjects(),
+        ]);
+      } catch {
+        alert('복구 중 오류가 발생했습니다.');
+      } finally {
+        setIsRestoring(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
+        <div className="max-w-sm w-full text-center space-y-6">
+          {/* 아이콘 */}
+          <div className="w-16 h-16 rounded-3xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto">
+            <span className="text-3xl">🗑️</span>
+          </div>
+
+          {/* 동아리명 취소선 */}
+          <div>
+            <p className="text-xs font-black text-black/30 uppercase tracking-widest mb-2">삭제된 동아리</p>
+            <h2 className="text-2xl font-black text-black/30 line-through">{clubName}</h2>
+          </div>
+
+          <p className="text-sm text-black/40 font-medium leading-relaxed">
+            이 동아리는 삭제 처리되었습니다.<br />
+            복구하면 모든 데이터가 다시 활성화됩니다.
+          </p>
+
+          {/* 복구 버튼 */}
+          <button
+            onClick={handleRestore}
+            disabled={isRestoring}
+            className="w-full py-4 bg-black text-white font-black rounded-2xl text-sm
+                       hover:bg-black/85 active:scale-[0.98] transition-all
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isRestoring ? '복구 중...' : '🔄 동아리 복구하기'}
+          </button>
+
+          <p className="text-xs text-black/25">
+            복구하지 않으려면 동아리 전환에서 다른 동아리를 선택하세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* 빈 동아리 → 웰컴 페이지 */
+  if (isNewClub && clubId) {
+    return (
+      <AdminClubWelcome
+        clubName={clubName}
+        clubId={clubId}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen font-sans w-full bg-white">
@@ -238,12 +385,9 @@ export function AdminDashboard() {
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden text-black pt-10 pb-14 px-6 bg-white"
-        style={{
-          borderBottom: '1px solid rgba(0,0,0,0.08)',
-        }}
+        className="relative overflow-hidden text-black pt-16 pb-14 px-6 bg-white"
+        style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
       >
-        {/* 네온 라인 */}
         <div className="absolute top-0 inset-x-0 h-[1px]
                         bg-gradient-to-r from-transparent via-black/20 to-transparent" />
         <div className="pointer-events-none absolute -top-20 -right-20 w-96 h-96
@@ -262,20 +406,16 @@ export function AdminDashboard() {
       {/* ── 콘텐츠 ── */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 relative z-20 space-y-6 pb-24">
 
-        {/* ── 3 Key Metrics Slim Summary Bar ── */}
+        {/* ── 3 Key Metrics ── */}
         <motion.section
           custom={0} variants={fadeUp} initial="hidden" animate="visible"
           className="bg-white rounded-3xl border border-black/20 p-6"
         >
-          {/* 제목 */}
           <h2 className="text-xl font-black text-black mb-5">✨ 동아리 현황</h2>
-
-          {/* 3열 가로 요약 바 */}
           <div className="grid grid-cols-3 divide-x divide-black/20">
-            {/* Column 1: 총 인원 */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+
+            {/* 총 인원 */}
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/admin/members')}
               className="flex flex-col items-center justify-center py-5 px-4 hover:bg-black/5 cursor-pointer transition-colors"
             >
@@ -292,10 +432,8 @@ export function AdminDashboard() {
               </div>
             </motion.button>
 
-            {/* Column 2: 출석 인원 */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            {/* 오늘 출석 */}
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => navigate(`/admin/attendance?date=${todayYMD()}`)}
               className="flex flex-col items-center justify-center py-5 px-4 hover:bg-black/5 cursor-pointer transition-colors"
             >
@@ -316,10 +454,8 @@ export function AdminDashboard() {
               </div>
             </motion.button>
 
-            {/* Column 3: 활성 과제 */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            {/* 활성 과제 */}
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/admin/assignments?filter=pending')}
               className="flex flex-col items-center justify-center py-5 px-4 hover:bg-black/5 cursor-pointer transition-colors"
             >
@@ -439,144 +575,181 @@ export function AdminDashboard() {
             </Btn>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-black/20">
-            <Btn onClick={() => setIsScheduleModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-full
-                         font-black text-xs text-white bg-black
-                         hover:bg-black/90 transition-colors">
-              <CalendarPlus className="w-3.5 h-3.5" />
-              일정 및 과제 추가하기
-            </Btn>
-          </div>
         </motion.section>
 
-        {/* ── 인기 동아리 + 인기 프로젝트 ── */}
-        <motion.div
-          variants={stagger} initial="hidden" animate="visible"
-          className="grid grid-cols-1 lg:grid-cols-2 gap-5"
+        {/* ── 다가오는 일정 미리보기 ── */}
+        <motion.section
+          custom={3} variants={fadeUp} initial="hidden" animate="visible"
+          className="bg-white rounded-3xl p-6 border border-black/20"
         >
-
-          {/* 인기 동아리 */}
-          <motion.section custom={0} variants={fadeUp} className="bg-white rounded-3xl p-6 flex flex-col border border-black/20">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-black/8 border border-black/20 flex items-center justify-center">
-                  <Megaphone className="w-3.5 h-3.5 text-black" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-black">인기 동아리</h2>
-                  <p className="text-xs text-black/70">이번 주 기준</p>
-                </div>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-black/8 border border-black/20">
+                <CalendarDays className="w-4 h-4 text-black" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-black">다가오는 일정</h2>
+                <p className="text-xs text-black/60 mt-0.5">승인된 일정 기준</p>
               </div>
             </div>
+            <button
+              onClick={() => navigate('/admin/schedules')}
+              className="flex items-center gap-1 text-xs font-black text-black/50 hover:text-black transition-colors"
+            >
+              일정 더보기 <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-            <div className="flex-1 space-y-2">
-              {clubsLoading ? (
-                <div className="py-6 flex items-center justify-center gap-2 text-black/30">
-                  <span className="text-sm font-black">불러오는 중...</span>
-                </div>
-              ) : popularClubs.length === 0 ? (
-                <div className="py-6 text-center text-black/30 text-sm font-black">
-                  등록된 동아리가 없습니다
-                </div>
-              ) : null}
-              {!clubsLoading && popularClubs.map((club, i) => (
-                <motion.div key={club.id}
-                  whileHover={{ x: 4 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  onClick={() => navigate(`/club/${club.id}`)}
-                  className="flex items-center gap-3.5 p-3 rounded-2xl border border-black/20
-                             hover:border-black/40 hover:bg-black/5 transition-all cursor-pointer group"
+          {upcomingLoading ? (
+            <div className="py-6 text-center text-sm text-black/30 font-black">불러오는 중...</div>
+          ) : !hasUpcoming ? (
+            <div className="py-8 text-center">
+              <CalendarDays className="w-8 h-8 text-black/15 mx-auto mb-2" />
+              <p className="text-sm font-black text-black/40">다가오는 과제 및 일정이 없습니다.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {/* 일반 일정 2개 */}
+              {upcomingSchedules.map(s => (
+                <div key={s.id}
+                  className="flex items-center gap-3.5 p-3.5 rounded-2xl border border-black/20 hover:bg-black/[0.03] transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0
-                       bg-black/8 border border-black/20">
-                    {club.emoji}
+                  <div className="w-9 h-9 rounded-xl bg-black/8 border border-black/20 flex items-center justify-center shrink-0">
+                    <CalendarDays className="w-4 h-4 text-black/60" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-black text-black text-sm truncate">{club.name}</p>
-                      <span className="text-xs font-bold ml-2 shrink-0 text-black">{club.pct}%</span>
-                    </div>
-                    <div className="h-1 rounded-full bg-black/20">
-                      <div className="h-full rounded-full transition-all bg-black/60"
-                           style={{ width: `${club.pct}%` }} />
-                    </div>
-                    <div className="flex items-center gap-1 mt-1 text-[10px] text-black/60">
-                      <Users className="w-2.5 h-2.5" /> {club.members}명
-                    </div>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-black/40 group-hover:text-black/60 transition-colors shrink-0" />
-                </motion.div>
-              ))}
-            </div>
-
-            <Btn onClick={() => navigate('/user/clubs')}
-              className="mt-5 w-full py-2.5 text-xs font-black flex items-center justify-center gap-1.5
-                         bg-black text-white hover:bg-black/90 rounded-full transition-colors">
-              더 많은 동아리 <ChevronRight className="w-3 h-3" />
-            </Btn>
-          </motion.section>
-
-          {/* 인기 프로젝트 */}
-          <motion.section custom={1} variants={fadeUp} className="bg-white rounded-3xl p-6 flex flex-col border border-black/20">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-black/8 border border-black/20 flex items-center justify-center">
-                  <Layers className="w-3.5 h-3.5 text-black" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-black">인기 프로젝트</h2>
-                  <p className="text-xs text-black/70">조회수 순</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 space-y-2">
-              {hotProjects.map(project => (
-                <motion.div key={project.id}
-                  whileHover={{ x: 4 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  onClick={() => navigate(`/project/${project.id}`)}
-                  className="flex items-center gap-3.5 p-3 rounded-2xl border border-black/20
-                             hover:border-black/40 hover:bg-black/5 transition-all cursor-pointer group"
-                >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0
-                       bg-black/8 border border-black/20">
-                    {project.emoji}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="font-black text-black text-sm truncate">{project.title}</p>
-                      {project.views >= 500 && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black
-                                         text-white bg-black border border-black/20
-                                         px-1.5 py-0.5 rounded-full shrink-0">
-                          <Flame className="w-2 h-2" /> HOT
+                    <p className="font-black text-black text-sm truncate">{s.title}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-black/50">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatDate(s.date)}{s.time ? ` ${s.time.slice(0, 5)}` : ''}
+                      </span>
+                      {s.location && (
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3 shrink-0" />{s.location}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] text-black/60">
+                  </div>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-black/8 border border-black/20 text-black/60 shrink-0">
+                    일정
+                  </span>
+                </div>
+              ))}
+
+              {/* 과제 1개 */}
+              {upcomingAssignment && (
+                <div
+                  className="flex items-center gap-3.5 p-3.5 rounded-2xl border border-black/30 bg-black/[0.02] hover:bg-black/[0.04] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-black/12 border border-black/25 flex items-center justify-center shrink-0">
+                    <span className="text-base">📋</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-black text-sm truncate">{upcomingAssignment.title}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-black/50">
                       <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-black/40 shrink-0" />
-                        {project.status}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-2.5 h-2.5" /> {project.views.toLocaleString()}회
+                        <Clock className="w-3 h-3" />
+                        {formatDate(upcomingAssignment.date)}{upcomingAssignment.time ? ` ${upcomingAssignment.time.slice(0, 5)}` : ''}
                       </span>
                     </div>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-black/40 group-hover:text-black/60 transition-colors shrink-0" />
-                </motion.div>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-black text-white shrink-0">
+                    과제
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => setIsScheduleModalOpen(true)}
+            className="mt-4 w-full py-3 rounded-full text-xs font-black
+                       bg-black text-white hover:bg-black/90
+                       transition-colors flex items-center justify-center gap-1.5"
+          >
+            <CalendarPlus className="w-3.5 h-3.5" />
+            일정 및 과제 추가하기
+          </button>
+        </motion.section>
+
+        {/* ── 프로젝트(팀) 관리 ── */}
+        <motion.section
+          custom={4} variants={fadeUp} initial="hidden" animate="visible"
+          className="bg-white rounded-3xl p-6 border border-black/20"
+        >
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-black/8 border border-black/20">
+                <Rocket className="w-4 h-4 text-black" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-black">프로젝트(팀) 관리</h2>
+                <p className="text-xs text-black/60 mt-0.5">동아리 내 팀 프로젝트를 관리하세요</p>
+              </div>
+            </div>
+            {projects.length > 0 && (
+              <button
+                onClick={() => navigate('/admin/projects')}
+                className="flex items-center gap-1 text-xs font-black text-black/50 hover:text-black transition-colors"
+              >
+                전체 보기 <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {projectsLoading ? (
+            <div className="flex items-center justify-center py-8 gap-2 text-black/30">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-xs font-black">불러오는 중...</span>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="py-10 flex flex-col items-center justify-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-black/5 flex items-center justify-center mb-1">
+                <Rocket className="w-6 h-6 text-black/20" />
+              </div>
+              <p className="text-sm font-black text-black/40">아직 등록된 프로젝트가 없습니다</p>
+              <p className="text-xs text-black/25">첫 번째 팀 프로젝트를 만들어보세요!</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {projects.map(p => (
+                <motion.button
+                  key={p.id}
+                  whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate(`/admin/projects/${p.id}`)}
+                  className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl border border-black/12
+                             hover:bg-black/[0.02] transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-black/8 flex items-center justify-center text-lg shrink-0">
+                    {p.emoji || '🚀'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-black text-sm truncate">{p.title}</p>
+                  </div>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                    p.status === 'active'  ? 'bg-black text-white' :
+                    p.status === 'closed' ? 'bg-black/15 text-black/50' :
+                    'bg-black/8 text-black/50 border border-black/20'
+                  }`}>
+                    {p.status === 'active' ? '진행 중' : p.status === 'closed' ? '완료' : '준비 중'}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-black/20 shrink-0" />
+                </motion.button>
               ))}
             </div>
+          )}
 
-            <Btn onClick={() => navigate('/projects')}
-              className="mt-5 w-full py-2.5 text-xs font-black flex items-center justify-center gap-1.5
-                         bg-black text-white hover:bg-black/90 rounded-full transition-colors">
-              더 많은 프로젝트 <ChevronRight className="w-3 h-3" />
-            </Btn>
-          </motion.section>
-        </motion.div>
+          <button
+            onClick={() => navigate('/admin/projects')}
+            className="mt-3 w-full py-3 rounded-full text-xs font-black
+                       border border-black/20 text-black/60 hover:bg-black/5 hover:text-black
+                       transition-colors flex items-center justify-center gap-1.5"
+          >
+            <Tag className="w-3.5 h-3.5" />
+            {projects.length === 0 ? '첫 프로젝트 등록하기' : '프로젝트 관리 페이지로'}
+          </button>
+        </motion.section>
 
       </div>
 
@@ -584,7 +757,10 @@ export function AdminDashboard() {
         <AttendanceQR scheduleId={selectedScheduleId || undefined} onClose={() => setIsQRModalOpen(false)} />
       )}
       {isScheduleModalOpen && (
-        <ScheduleModal onClose={() => setIsScheduleModalOpen(false)} onSaved={() => setIsScheduleModalOpen(false)} />
+        <ScheduleModal
+          onClose={() => setIsScheduleModalOpen(false)}
+          onSaved={() => { setIsScheduleModalOpen(false); fetchUpcoming(); fetchMetrics(); }}
+        />
       )}
     </div>
   );

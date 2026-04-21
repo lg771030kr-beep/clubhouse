@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { useAdminGuard } from '../../hooks/useAdminGuard';
 import { UserProfile, Role } from '../../types';
 import {
   Users, Search, Award, Shield, User,
@@ -14,11 +16,14 @@ import { MemberDetailModal } from '../../components/admin/MemberDetailModal';
 const PAGE_SIZE = 10;
 
 export function MemberManagement() {
+  const { profile, activeClubId } = useAuth();
+  const { verified, checking } = useAdminGuard();
   const [members,     setMembers]     = useState<UserProfile[]>([]);
   const [isLoading,   setIsLoading]   = useState(true);
   const [searchTerm,  setSearchTerm]  = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [modalUserId, setModalUserId] = useState<string | null>(null);
+  const [clubId,      setClubId]      = useState<string | null>(null);
 
   const [isAdding,    setIsAdding]    = useState(false);
   const [isSubmitting,setIsSubmitting]= useState(false);
@@ -32,32 +37,116 @@ export function MemberManagement() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  useEffect(() => { fetchMembers(); }, []);
+  useEffect(() => { if (profile?.id && activeClubId) fetchMembers(); }, [profile?.id, activeClubId]);
 
   const fetchMembers = async () => {
+    const cId = activeClubId;
+    const adminId = profile?.id;
+    if (!cId || !adminId) return;
+
+    setIsLoading(true);
+    setClubId(cId);
+
+    // ① admin이 club_members에 없으면 자동 삽입 시도 (실패해도 계속 진행)
     try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('profiles').select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setMembers(data as UserProfile[]);
-    } catch (err) {
-      console.error('Error fetching members:', err);
-    } finally {
-      setIsLoading(false);
+      const { data: existing } = await supabase
+        .from('club_members')
+        .select('user_id')
+        .eq('club_id', cId)
+        .eq('user_id', adminId)
+        .maybeSingle();
+
+      if (!existing) {
+        const { error: insErr } = await supabase
+          .from('club_members')
+          .insert({ club_id: cId, user_id: adminId, role: 'ADMIN' });
+        if (insErr) console.warn('[MemberManagement] admin 자동 삽입 실패:', insErr.message);
+      }
+    } catch (e) {
+      console.warn('[MemberManagement] admin 체크/삽입 중 오류:', e);
     }
+
+    // ② 동아리 전체 멤버 조회 (오류 시 빈 배열로 폴백)
+    let memberProfiles: UserProfile[] = [];
+    try {
+      const { data: clubMembers, error } = await supabase
+        .from('club_members')
+        .select('user_id, role, profiles(*)')
+        .eq('club_id', cId);
+
+      if (error) {
+        console.warn('[MemberManagement] club_members 조회 실패:', error.message);
+      } else {
+        interface MembershipRow { user_id: string; role: string; profiles: UserProfile | UserProfile[] | null; }
+        memberProfiles = ((clubMembers ?? []) as MembershipRow[])
+          .map((row) => Array.isArray(row.profiles) ? row.profiles[0] : row.profiles)
+          .filter((p): p is UserProfile => p != null);
+      }
+    } catch (e) {
+      console.warn('[MemberManagement] 멤버 조회 중 오류:', e);
+    }
+
+    // ③ admin이 여전히 목록에 없으면 → profiles 테이블에서 직접 조회해 맨 앞에 추가 (항상 실행)
+    if (!memberProfiles.find(p => p.id === adminId)) {
+      try {
+        const { data: adminProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', adminId)
+          .single();
+        if (adminProfile) memberProfiles = [adminProfile as UserProfile, ...memberProfiles];
+      } catch (e) {
+        console.warn('[MemberManagement] admin 프로필 직접 조회 실패:', e);
+      }
+    }
+
+    setMembers(memberProfiles);
+    setIsLoading(false);
   };
 
   const handleRoleChange = async (userId: string, newRole: Role) => {
+    // 운영진 최소 1명 보호: 현재 ADMIN인 멤버가 1명뿐인데 그 사람의 역할을 바꾸려 할 때 차단
+    const adminCount = members.filter(m => (m.role || '').toUpperCase() === 'ADMIN').length;
+    const targetMember = members.find(m => m.id === userId);
+    const isLastAdmin  = adminCount === 1 && (targetMember?.role || '').toUpperCase() === 'ADMIN';
+
+    if (isLastAdmin && newRole !== 'ADMIN') {
+      showToast('⚠️ 운영진이 최소 1명은 있어야 합니다.');
+      return;
+    }
+
     try {
-      const { error } = await supabase
+      // ── 서버 측 소유권 재검증: 요청자가 이 동아리의 admin_id인지 확인 ──
+      const { data: ownerCheck, error: ownerErr } = await supabase
+        .from('clubs')
+        .select('id')
+        .eq('id', activeClubId!)
+        .eq('admin_id', profile!.id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (ownerErr || !ownerCheck) {
+        showToast('권한이 없습니다.');
+        return;
+      }
+
+      // profiles 테이블 role 업데이트
+      const { error: profileErr } = await supabase
         .from('profiles').update({ role: newRole }).eq('id', userId);
-      if (error) throw error;
+      if (profileErr) throw profileErr;
+
+      // club_members 테이블 role 도 함께 업데이트
+      if (clubId) {
+        await supabase
+          .from('club_members')
+          .update({ role: newRole })
+          .eq('club_id', clubId)
+          .eq('user_id', userId);
+      }
+
       setMembers(members.map(m => m.id === userId ? { ...m, role: newRole } : m));
       showToast('역할이 성공적으로 변경되었습니다!');
-    } catch (err: any) {
-      alert('역할 변경에 실패했습니다. ' + (err.message || ''));
+    } catch (err: unknown) {
+      alert('역할 변경에 실패했습니다. ' + (err instanceof Error ? err.message : ''));
     }
   };
 
@@ -84,8 +173,8 @@ export function MemberManagement() {
       setCurrentPage(1);
       setNewMember({ full_name: '', email: '', univ_name: '', role: 'USER' });
       showToast('부원이 등록되었습니다!');
-    } catch (err: any) {
-      alert(`부원 등록에 실패했습니다.\n${err.message || ''}`);
+    } catch (err: unknown) {
+      alert(`부원 등록에 실패했습니다.\n${err instanceof Error ? err.message : ''}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -113,19 +202,23 @@ export function MemberManagement() {
   /* ═══════════════════════════════════════════
      Render
   ═══════════════════════════════════════════ */
+  if (checking || !verified) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-black/30 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white pb-24">
 
       {/* ── 상단 헤더 배너 (White) ── */}
-      <div className="bg-white text-black pt-12 pb-16 px-6 shadow-sm" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+      <div className="bg-white text-black pt-16 pb-16 px-6 shadow-sm" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
         <div className="relative z-10 max-w-5xl mx-auto">
           <BackButton to="/admin" className="mb-4" />
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <span className="inline-block mb-3 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase
-                               bg-black/15 border border-black/20 text-black">
-                Members
-              </span>
               <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
                 <Users className="w-8 h-8 opacity-90" />
                 부원 관리
@@ -356,7 +449,7 @@ export function MemberManagement() {
                     <input
                       required={f.required}
                       type={f.type}
-                      value={(newMember as any)[f.key]}
+                      value={newMember[f.key as keyof typeof newMember]}
                       onChange={e => setNewMember({ ...newMember, [f.key]: e.target.value })}
                       placeholder={f.placeholder}
                       className="w-full p-4 rounded-2xl bg-white border border-black/20 text-black placeholder:text-black/50

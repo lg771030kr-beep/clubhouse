@@ -110,12 +110,28 @@ export function MemberDetail() {
 
         if (!prof) { setNotFound(true); return; }
 
+        interface ProfileRow {
+          full_name: string | null; email: string | null; role: string | null;
+          created_at: string | null; univ_name: string | null;
+        }
+        type SchedJoin = { title: string | null; date: string | null };
+        interface AttendanceWithSchedule {
+          status: string; marked_at: string | null;
+          schedules: SchedJoin | SchedJoin[] | null;
+        }
+        type AssignJoin = { title: string | null; due_date: string | null };
+        interface SubmissionWithAssignment {
+          submitted_at: string | null; score: number | null;
+          assignments: AssignJoin | AssignJoin[] | null;
+        }
+
+        const p = prof as ProfileRow;
         setMember({
-          name:     (prof as any).full_name ?? '멤버',
-          email:    (prof as any).email     ?? '',
-          role:     ((prof as any).role as MemberProfile['role']) ?? 'USER',
-          joinedAt: (prof as any).created_at ? String((prof as any).created_at).substring(0, 10) : '',
-          team:     (prof as any).univ_name  ?? '',
+          name:     p.full_name ?? '멤버',
+          email:    p.email     ?? '',
+          role:     (p.role as MemberProfile['role']) ?? 'USER',
+          joinedAt: p.created_at ? p.created_at.substring(0, 10) : '',
+          team:     p.univ_name  ?? '',
         });
 
         // 2. 출결 기록
@@ -128,14 +144,17 @@ export function MemberDetail() {
 
         if (attData && attData.length > 0) {
           const sm: Record<string, AttendStatus> = { PRESENT: '출석', LATE: '지각', ABSENT: '결석' };
-          setAttendRecords((attData as any[]).map(r => ({
-            date:    r.schedules?.date  ?? '',
-            session: r.schedules?.title ?? '일정',
-            status:  sm[r.status] ?? '결석',
-            time:    r.marked_at
-              ? new Date(r.marked_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
-              : null,
-          })));
+          setAttendRecords((attData as unknown as AttendanceWithSchedule[]).map(r => {
+            const sched = Array.isArray(r.schedules) ? r.schedules[0] : r.schedules;
+            return {
+              date:    sched?.date  ?? '',
+              session: sched?.title ?? '일정',
+              status:  sm[r.status] ?? '결석',
+              time:    r.marked_at
+                ? new Date(r.marked_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+                : null,
+            };
+          }));
         }
 
         // 3. 과제 제출 (optional)
@@ -147,13 +166,16 @@ export function MemberDetail() {
             .order('submitted_at', { ascending: false });
 
           if (!subErr && subData && subData.length > 0) {
-            setAssignRecords((subData as any[]).map(s => ({
-              title:       s.assignments?.title    ?? '과제',
-              dueDate:     s.assignments?.due_date ?? '',
-              isSubmitted: true,
-              submittedAt: s.submitted_at ? String(s.submitted_at).substring(0, 16).replace('T', ' ') : null,
-              score:       s.score ?? null,
-            })));
+            setAssignRecords((subData as unknown as SubmissionWithAssignment[]).map(s => {
+              const assign = Array.isArray(s.assignments) ? s.assignments[0] : s.assignments;
+              return {
+                title:       assign?.title    ?? '과제',
+                dueDate:     assign?.due_date ?? '',
+                isSubmitted: true,
+                submittedAt: s.submitted_at ? s.submitted_at.substring(0, 16).replace('T', ' ') : null,
+                score:       s.score ?? null,
+              };
+            }));
           }
         } catch { /* submissions 테이블 없음 */ }
 
@@ -187,7 +209,7 @@ export function MemberDetail() {
   /* ── 없음 ── */
   if (notFound || !member) {
     return (
-      <div className="min-h-screen bg-white px-4 pt-6">
+      <div className="min-h-screen bg-white px-4 pt-14">
         <BackButton to="/admin/members" label="부원 목록으로" />
         <div className="py-24 text-center text-black/40">
           <Users className="w-10 h-10 mx-auto mb-4 opacity-40" />
@@ -199,7 +221,7 @@ export function MemberDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-white px-4 pt-6 pb-16">
+    <div className="min-h-screen bg-white px-4 pt-14 pb-16">
       <div className="max-w-4xl mx-auto space-y-6">
         <BackButton to="/admin/members" label="부원 목록으로" />
 

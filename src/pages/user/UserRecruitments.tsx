@@ -1,172 +1,145 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import {
-  ChevronRight, Search, Megaphone,
-  Clock, Users, CheckCircle2, CalendarDays,
-} from 'lucide-react';
+import { Search, Users, Compass, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BackButton } from '../../components/common/BackButton';
 
-interface Recruitment {
-  id: number;
-  clubId: number;
-  clubName: string;
-  clubEmoji: string;
-  clubField: string;
-  posterEmoji: string;
-  accentColor: string;
-  title: string;
-  target: string;
-  quota: number;
-  deadline: string;
-  period: string;
-  requirements: string[];
-  process: string[];
+/* ── 타입 ── */
+interface Club {
+  id: string;
+  name: string;
+  category: string | null;
+  logo_url: string | null;
+  description: string | null;
+  is_recruiting: boolean;
+  recruit_link: string | null;
+  recruit_description: string | null;
+  member_count: number;
 }
 
-const TODAY = new Date('2026-03-20');
-function calcDday(deadline: string): number {
-  return Math.ceil((new Date(deadline).getTime() - TODAY.getTime()) / 86_400_000);
-}
-
-const ALL_RECRUITMENTS: Recruitment[] = [
-  {
-    id: 1, clubId: 1, clubName: 'Club DX 개발팀', clubEmoji: '💻', clubField: '개발',
-    posterEmoji: '🖥️', accentColor: '#22d3ee',
-    title: '2026 Spring 신입 부원 모집', target: '개발에 열정 있는 누구나 (전공 무관)',
-    quota: 10, deadline: '2026-03-31', period: '2026.03.01 ~ 2026.03.31',
-    requirements: ['기초 프로그래밍 경험', '매주 정기 세션 참여 가능', '협업을 좋아하는 분'],
-    process: ['서류 접수', '코딩 테스트', '면담', '최종 합격'],
-  },
-  {
-    id: 2, clubId: 2, clubName: '크리에이티브 디자인', clubEmoji: '🎨', clubField: '디자인',
-    posterEmoji: '✏️', accentColor: '#ec4899',
-    title: '2026 상반기 디자이너 모집', target: '디자인에 관심 있는 누구나',
-    quota: 6, deadline: '2026-04-05', period: '2026.03.10 ~ 2026.04.05',
-    requirements: ['기초 Figma 사용 가능자', '포트폴리오 1개 이상', '정기 모임 참여 가능'],
-    process: ['포트폴리오 제출', '과제 전형', '면담', '합격'],
-  },
-  {
-    id: 3, clubId: 4, clubName: '알고리즘 스터디', clubEmoji: '🧠', clubField: '개발',
-    posterEmoji: '🔢', accentColor: '#6366f1',
-    title: '2026 봄학기 스터디원 모집', target: 'BOJ 실버 이상 또는 동급 실력 보유자',
-    quota: 8, deadline: '2026-03-25', period: '2026.03.15 ~ 2026.03.25',
-    requirements: ['알고리즘 기초 학습 경험', '주 1회 오프라인 세션 참여', '코드 리뷰에 적극 참여'],
-    process: ['지원서 접수', '간단 코딩 과제', '합격'],
-  },
-  {
-    id: 4, clubId: 6, clubName: '게임 크리에이터', clubEmoji: '🎮', clubField: '개발',
-    posterEmoji: '🌌', accentColor: '#8b5cf6',
-    title: '2026 신학기 게임 개발 팀원 모집', target: 'Unity 또는 언리얼 경험자 우대',
-    quota: 5, deadline: '2026-04-10', period: '2026.03.20 ~ 2026.04.10',
-    requirements: ['게임 개발 기초 이해', '팀 프로젝트 경험 우대', '주 2회 작업 세션 참여'],
-    process: ['지원서 접수', '포트폴리오 심사', '팀 미팅', '합격'],
-  },
-  {
-    id: 5, clubId: 5, clubName: '창업 스타터', clubEmoji: '🚀', clubField: '창업',
-    posterEmoji: '💡', accentColor: '#10b981',
-    title: '2026 시즌 2 팀원 충원', target: '창업에 진심인 1~3학년',
-    quota: 4, deadline: '2026-04-20', period: '2026.04.01 ~ 2026.04.20',
-    requirements: ['사업계획서 작성 경험 우대', '주 1회 미팅 필수 참여', '스타트업에 관심 있는 분'],
-    process: ['지원서 + 아이디어 제출', '발표 면접', '최종 선발'],
-  },
-];
-
-const FIELD_BADGE: Record<string, string> = {
-  개발:   'stat-badge-cyan',
-  디자인: 'stat-badge-violet',
-  마케팅: 'stat-badge-amber',
-  창업:   'stat-badge-emerald',
+/* ── 카테고리별 이모지 ── */
+const CAT_EMOJI: Record<string, string> = {
+  개발: '💻', 디자인: '🎨', 마케팅: '📣', 창업: '🚀',
+  기획: '📋', 사진: '📷', 음악: '🎵', 스포츠: '⚽',
 };
+const getCatEmoji = (cat: string | null) => CAT_EMOJI[cat ?? ''] ?? '🏢';
 
-const FIELD_TABS = ['전체', '개발', '디자인', '마케팅', '창업'];
+/* ── 카테고리별 accent 색 ── */
+const CAT_COLOR: Record<string, string> = {
+  개발: '#22d3ee', 디자인: '#ec4899', 마케팅: '#f59e0b',
+  창업: '#10b981', 기획: '#6366f1', 사진: '#f97316',
+  음악: '#a78bfa', 스포츠: '#34d399',
+};
+const getCatColor = (cat: string | null) => CAT_COLOR[cat ?? ''] ?? '#6366f1';
 
-const CAT_ACCENT_R: Record<string, string>  = { 개발: '#22d3ee', 디자인: '#ec4899', 마케팅: '#f59e0b', 창업: '#10b981' };
-const CAT_EMOJI_R: Record<string, string>   = { 개발: '💻', 디자인: '🎨', 마케팅: '📣', 창업: '🚀' };
-const CAT_POSTER_R: Record<string, string>  = { 개발: '🖥️', 디자인: '✏️', 마케팅: '📢', 창업: '💡' };
+const FIELD_TABS = ['전체', '개발', '디자인', '마케팅', '창업', '기획', '사진', '음악', '스포츠'];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapRecruitment(c: any, idx: number): Recruitment {
-  const cat = c.category ?? '개발';
-  return {
-    id:           c.id ?? idx,
-    clubId:       c.id ?? idx,
-    clubName:     c.name ?? '알 수 없음',
-    clubEmoji:    CAT_EMOJI_R[cat]  ?? '🏢',
-    clubField:    cat,
-    posterEmoji:  CAT_POSTER_R[cat] ?? '📋',
-    accentColor:  CAT_ACCENT_R[cat] ?? '#6366f1',
-    title:        c.recruit_title   ?? `${c.name} 신입 모집`,
-    target:       c.recruit_target  ?? '관심 있는 누구나',
-    quota:        c.recruit_quota   ?? 0,
-    deadline:     c.recruit_deadline ?? '2026-12-31',
-    period:       c.recruit_period  ?? '-',
-    requirements: Array.isArray(c.requirements) ? c.requirements : [],
-    process:      Array.isArray(c.process) ? c.process : ['지원서 접수', '면담', '합격'],
-  };
-}
-
-/* D-Day Badge */
-function DDayBadge({ deadline }: { deadline: string }) {
-  const d = calcDday(deadline);
-  if (d < 0) return (
-    <span className="text-[11px] font-black px-3 py-1 rounded-full stat-badge-indigo opacity-60">마감</span>
-  );
-  if (d === 0) return (
-    <span className="text-[11px] font-black px-3 py-1 rounded-full stat-badge-rose animate-pulse">D-Day</span>
-  );
-  if (d <= 7) return (
-    <span className="text-[11px] font-black px-3 py-1 rounded-full stat-badge-rose">D-{d}</span>
-  );
-  return (
-    <span className="text-[11px] font-black px-3 py-1 rounded-full stat-badge-cyan">D-{d}</span>
-  );
-}
-
+/* ════════════════════════════════════════
+   Component
+════════════════════════════════════════ */
 export function UserRecruitments() {
   const navigate = useNavigate();
-  const [query,        setQuery]        = useState('');
-  const [field,        setField]        = useState('전체');
-  const [recruitments, setRecruitments] = useState<Recruitment[]>(ALL_RECRUITMENTS);
+  const [query,   setQuery]   = useState('');
+  const [field,   setField]   = useState('전체');
+  const [clubs,   setClubs]   = useState<Club[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  /* ── DB에서 전체 동아리 로드 ── */
   useEffect(() => {
-    async function loadRecruitments() {
-      const { data, error } = await supabase
-        .from('clubs')
-        .select('id, name, category, logo_url, is_recruiting, recruit_link, recruit_title, recruit_target, recruit_quota, recruit_deadline, recruit_period, requirements, process')
-        .eq('is_recruiting', true)
-        .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0)
-        setRecruitments(data.map((c, i) => mapRecruitment(c, i)));
+    async function load() {
+      setLoading(true);
+      try {
+        // ① 기본 컬럼만 우선 조회 (없는 컬럼 포함 시 400 방지)
+        const { data: baseData, error: baseErr } = await supabase
+          .from('clubs')
+          .select('id, name, category, logo_url, description, created_at')
+          .order('created_at', { ascending: false });
+
+        if (baseErr) {
+          console.error('[동아리 찾기] clubs 로드 실패:', baseErr.message);
+          return;
+        }
+        if (!baseData || baseData.length === 0) return;
+
+        // ② is_recruiting 등 선택적 컬럼 별도 조회 (없으면 무시)
+        let recruitMap: Record<string, { is_recruiting: boolean; recruit_link: string | null; recruit_description: string | null }> = {};
+        try {
+          const { data: rData } = await supabase
+            .from('clubs')
+            .select('id, is_recruiting, recruit_link, recruit_description')
+            .in('id', baseData.map(c => c.id));
+          interface RecruitRow { id: string; is_recruiting: boolean | null; recruit_link: string | null; recruit_description: string | null; }
+          (rData as RecruitRow[] ?? []).forEach((r) => {
+            recruitMap[r.id] = {
+              is_recruiting:      r.is_recruiting      ?? false,
+              recruit_link:       r.recruit_link       ?? null,
+              recruit_description: r.recruit_description ?? null,
+            };
+          });
+        } catch { /* 컬럼 미존재 시 무시 — 기본값 false 사용 */ }
+
+        // ③ 멤버 수 일괄 조회
+        const { data: memData } = await supabase
+          .from('club_members')
+          .select('club_id')
+          .in('club_id', baseData.map(c => c.id));
+
+        const countMap: Record<string, number> = {};
+        interface MemberCountRow { club_id: string; }
+        (memData as MemberCountRow[] ?? []).forEach((m) => {
+          countMap[m.club_id] = (countMap[m.club_id] ?? 0) + 1;
+        });
+
+        const mapped = baseData.map(c => ({
+          id:                 c.id,
+          name:               c.name,
+          category:           c.category ?? null,
+          logo_url:           c.logo_url ?? null,
+          description:        c.description ?? null,
+          is_recruiting:      recruitMap[c.id]?.is_recruiting      ?? false,
+          recruit_link:       recruitMap[c.id]?.recruit_link       ?? null,
+          recruit_description: recruitMap[c.id]?.recruit_description ?? null,
+          member_count:       countMap[c.id] ?? 0,
+        }));
+
+        // 모집중 우선 정렬
+        mapped.sort((a, b) => Number(b.is_recruiting) - Number(a.is_recruiting));
+        setClubs(mapped);
+      } catch (e) {
+        console.error('[동아리 찾기] 예외:', e);
+      } finally {
+        setLoading(false);
+      }
     }
-    loadRecruitments();
+    load();
   }, []);
 
-  const filtered = recruitments.filter(r => {
-    const matchField = field === '전체' || r.clubField === field;
-    const matchQ = !query || r.clubName.includes(query) || r.title.includes(query) || r.target.includes(query);
+  /* ── 필터링 ── */
+  const filtered = clubs.filter(c => {
+    const matchField = field === '전체' || c.category === field;
+    const matchQ     = !query ||
+      c.name.includes(query) ||
+      (c.description ?? '').includes(query) ||
+      (c.category ?? '').includes(query);
     return matchField && matchQ;
   });
 
+  const recruitingCount = filtered.filter(c => c.is_recruiting).length;
+
   return (
-    <div className="min-h-screen bg-black pb-24">
+    <div className="min-h-screen bg-black pb-28">
 
       {/* ── 헤더 ── */}
       <div className="bg-black border-b border-white/10 px-6 pt-12 pb-16">
         <div className="max-w-3xl mx-auto">
           <BackButton onClick={() => navigate(-1)} className="mb-8" />
           <div className="flex items-center gap-3 mb-2">
-            <Megaphone className="w-6 h-6 text-white" />
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">모집공고 탐색</h1>
+            <Compass className="w-6 h-6 text-white" />
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">동아리 찾기</h1>
           </div>
           <p className="text-white/50 text-sm font-medium pl-1">
-            {recruitments.length}개 공고 · 나에게 딱 맞는 동아리를 찾아보세요
+            {loading ? '불러오는 중...' : `${clubs.length}개 동아리 · 모집중 ${clubs.filter(c => c.is_recruiting).length}개`}
           </p>
         </div>
       </div>
@@ -181,11 +154,14 @@ export function UserRecruitments() {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="동아리명·공고 제목으로 검색..."
+            placeholder="동아리명·분야·설명으로 검색..."
             className="flex-1 text-sm text-white placeholder:text-white/30 outline-none bg-transparent font-medium"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-white/40 hover:text-white text-lg leading-none transition-colors">×</button>
+            <button
+              onClick={() => setQuery('')}
+              className="text-white/40 hover:text-white text-lg leading-none transition-colors"
+            >×</button>
           )}
         </div>
 
@@ -206,124 +182,122 @@ export function UserRecruitments() {
           ))}
         </div>
 
-        <p className="text-xs font-bold text-white/40 px-1">{filtered.length}개의 모집공고</p>
+        {/* 카운트 라벨 */}
+        {!loading && (
+          <div className="flex items-center gap-3 px-1">
+            <p className="text-xs font-bold text-white/40">
+              {filtered.length}개 동아리
+            </p>
+            {recruitingCount > 0 && (
+              <span className="flex items-center gap-1 text-[10px] font-black text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                모집중 {recruitingCount}개
+              </span>
+            )}
+          </div>
+        )}
 
-        {/* ── 공고 카드 리스트 ── */}
-        {filtered.length === 0 ? (
+        {/* ── 로딩 ── */}
+        {loading && (
+          <div className="flex items-center justify-center py-20 gap-2 text-white/40">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm font-black">동아리 목록 불러오는 중...</span>
+          </div>
+        )}
+
+        {/* ── 빈 결과 ── */}
+        {!loading && filtered.length === 0 && (
           <div className="bg-black rounded-3xl border border-white/10 py-16 text-center">
             <p className="text-3xl mb-3">🔍</p>
-            <p className="text-white font-bold text-sm">해당하는 공고가 없습니다</p>
+            <p className="text-white font-bold text-sm">해당하는 동아리가 없습니다</p>
+            <p className="text-white/30 text-xs mt-1">검색어나 분야 필터를 바꿔보세요</p>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {filtered.map((rec, i) => {
-              const dday = calcDday(rec.deadline);
-              const isExpired = dday < 0;
+        )}
+
+        {/* ── 동아리 카드 리스트 ── */}
+        {!loading && filtered.length > 0 && (
+          <div className="space-y-3 pt-1">
+            {filtered.map((club, i) => {
+              const accent = getCatColor(club.category);
+              const emoji  = getCatEmoji(club.category);
               return (
                 <motion.div
-                  key={rec.id}
-                  initial={{ opacity: 0, y: 18 }}
+                  key={club.id}
+                  initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.07, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ delay: i * 0.05, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.99 }}
-                  onClick={() => navigate(`/club/${rec.clubId}`)}
-                  className={`bg-black border border-white/10 rounded-3xl overflow-hidden cursor-pointer hover:border-white/25 transition-all
-                    ${isExpired ? 'opacity-50' : ''}`}
+                  onClick={() => navigate(`/club/${club.id}`)}
+                  className="bg-black border border-white/10 rounded-3xl overflow-hidden cursor-pointer hover:border-white/25 transition-all"
                 >
-                  {/* 포스터 배너 */}
-                  <div
-                    className="relative h-28 flex items-center px-6 gap-4"
-                    style={{
-                      background: isExpired
-                        ? 'rgba(255,255,255,0.03)'
-                        : `linear-gradient(135deg, ${rec.accentColor}25 0%, ${rec.accentColor}10 100%)`,
-                      borderBottom: `1px solid ${rec.accentColor}25`,
-                    }}
-                  >
-                    <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-7xl opacity-8 select-none">
-                      {rec.posterEmoji}
-                    </div>
-
+                  {/* ★ 모집중 강조 배너 */}
+                  {club.is_recruiting && (
                     <div
-                      className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 border"
-                      style={{ background: `${rec.accentColor}18`, borderColor: `${rec.accentColor}35` }}
+                      className="flex items-center gap-2 px-5 py-2"
+                      style={{ background: `${accent}20`, borderBottom: `1px solid ${accent}30` }}
                     >
-                      {rec.clubEmoji}
+                      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accent }} />
+                      <span className="text-[11px] font-black tracking-widest uppercase" style={{ color: accent }}>
+                        모집중
+                      </span>
+                      {club.recruit_link && (
+                        <span className="ml-auto text-[10px] font-bold text-white/30">지원 링크 있음 →</span>
+                      )}
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black text-white/40 uppercase tracking-widest mb-1">
-                        {rec.clubName}
-                      </p>
-                      <h3 className="text-base sm:text-lg font-black text-white tracking-tight leading-tight line-clamp-2">
-                        {rec.title}
-                      </h3>
-                    </div>
-
-                    <div className="absolute top-3 right-4">
-                      <DDayBadge deadline={rec.deadline} />
-                    </div>
-                  </div>
+                  )}
 
                   {/* 카드 본문 */}
-                  <div className="p-5 space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-white/10 text-white/70 border border-white/15">
-                        {rec.clubField}
-                      </span>
-                      <span className="flex items-center gap-1 text-xs font-semibold text-white/40">
-                        <Users className="w-3 h-3" /> 모집 {rec.quota}명
-                      </span>
-                      <span className="flex items-center gap-1 text-xs font-semibold text-white/40">
-                        <CalendarDays className="w-3 h-3" /> {rec.period}
-                      </span>
+                  <div className="flex items-center gap-4 p-5">
+                    {/* 로고 */}
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border text-2xl overflow-hidden"
+                      style={{ background: `${accent}15`, borderColor: `${accent}30` }}
+                    >
+                      {club.logo_url
+                        ? <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover" />
+                        : emoji
+                      }
                     </div>
 
-                    <div>
-                      <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-1.5">지원 자격</p>
-                      <ul className="space-y-1">
-                        {rec.requirements.slice(0, 2).map((req, j) => (
-                          <li key={j} className="flex items-start gap-1.5 text-xs text-white/60 font-medium">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-white/40 shrink-0 mt-0.5" />
-                            {req}
-                          </li>
-                        ))}
-                        {rec.requirements.length > 2 && (
-                          <li className="text-xs text-white/30 font-medium pl-5">+{rec.requirements.length - 2}개 더</li>
-                        )}
-                      </ul>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {rec.process.map((step, j) => (
-                        <span key={j} className="flex items-center gap-1">
-                          <span className="text-[10px] bg-white/5 text-white/50 font-bold px-2.5 py-1 rounded-full border border-white/10">
-                            {j + 1}. {step}
+                    {/* 정보 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h3 className="font-black text-white text-sm leading-tight line-clamp-1">
+                          {club.name}
+                        </h3>
+                        {/* 비모집중 → 회색 배지 */}
+                        {!club.is_recruiting && (
+                          <span className="shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full bg-white/8 text-white/30 border border-white/10">
+                            모집 없음
                           </span>
-                          {j < rec.process.length - 1 && (
-                            <ChevronRight className="w-2.5 h-2.5 text-white/20 shrink-0" />
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                        )}
+                      </div>
 
-                    <div className="pt-1">
-                      {isExpired ? (
-                        <div className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-white/5 border border-white/10">
-                          <Clock className="w-4 h-4 text-white/30" />
-                          <span className="text-sm font-bold text-white/30">모집이 마감되었습니다</span>
-                        </div>
-                      ) : (
-                        <motion.div
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-white text-black font-black text-sm cursor-pointer select-none hover:bg-white/90 transition-colors"
-                        >
-                          <Megaphone className="w-4 h-4" />
-                          동아리 상세보기 &amp; 지원하기
-                        </motion.div>
+                      {club.description && (
+                        <p className="text-xs text-white/40 font-medium line-clamp-2 leading-relaxed">
+                          {club.description}
+                        </p>
                       )}
+
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {club.category && (
+                          <span
+                            className="text-[10px] font-black px-2.5 py-0.5 rounded-full border"
+                            style={{
+                              color: accent,
+                              borderColor: `${accent}40`,
+                              background: `${accent}12`,
+                            }}
+                          >
+                            {club.category}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1 text-[10px] text-white/30 font-bold">
+                          <Users className="w-3 h-3" />
+                          {club.member_count}명
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </motion.div>

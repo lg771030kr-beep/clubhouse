@@ -178,26 +178,23 @@ export const ScheduleDetail: React.FC = () => {
       const { data: clubsRaw } = await supabase.from('clubs').select('*');
       const clubList = (clubsRaw as Club[] | null) ?? [];
       const byId = new Map(clubList.map((c) => [c.id, c]));
-      const myClub = clubList.find((c) => c.name === profile?.univ_name) ?? null;
+
+      // 사용자 소속 클럽을 club_members 테이블에서 조회
+      const { data: memberRows } = await supabase
+        .from('club_members')
+        .select('club_id')
+        .eq('user_id', profile?.id ?? '');
+      const myClubIds = new Set((memberRows ?? []).map((r: { club_id: string }) => r.club_id));
+      const myClub = clubList.find((c) => myClubIds.has(c.id)) ?? null;
 
       // time 컬럼 null 가능 → .order('time') 제거, 클라이언트 정렬로 처리
       const schRes = await supabase
         .from('schedules')
-        .select('*, clubs(*)')
+        .select('*')
         .eq('is_approved', true)
         .order('date', { ascending: true });
 
-      let scheduleRows: DbSchedule[] = [];
-      if (schRes.error) {
-        const plain = await supabase
-          .from('schedules')
-          .select('*')
-          .eq('is_approved', true)
-          .order('date', { ascending: true });
-        scheduleRows = (plain.data as DbSchedule[] | null) ?? [];
-      } else {
-        scheduleRows = (schRes.data as DbSchedule[] | null) ?? [];
-      }
+      const scheduleRows: DbSchedule[] = (schRes.data as DbSchedule[] | null) ?? [];
 
       const fromSchedules: CalendarItem[] = scheduleRows.map((s) => ({
         id: `s:${s.id}`,
@@ -209,17 +206,12 @@ export const ScheduleDetail: React.FC = () => {
         location: s.location,
         assignment_template_url: s.assignment_template_url,
         kind: s.type === 'ASSIGNMENT' ? 'ASSIGNMENT' : 'GENERAL',
-        club: resolveClub(s, byId, myClub),
+        // club_id로 직접 매핑, 없으면 소속 클럽 fallback
+        club: s.club_id ? (byId.get(s.club_id) ?? myClub) : myClub,
       }));
 
-      const asgJoin = await supabase.from('assignments').select('*, clubs(*)');
-      let asgRows: DbAssignment[] = [];
-      if (asgJoin.error) {
-        const p = await supabase.from('assignments').select('*');
-        asgRows = (p.data as DbAssignment[] | null) ?? [];
-      } else {
-        asgRows = (asgJoin.data as DbAssignment[] | null) ?? [];
-      }
+      const { data: asgData } = await supabase.from('assignments').select('*');
+      const asgRows: DbAssignment[] = (asgData as DbAssignment[] | null) ?? [];
 
       const fromAssignments: CalendarItem[] = asgRows
         .map((a) => {
@@ -234,7 +226,7 @@ export const ScheduleDetail: React.FC = () => {
             location: null,
             assignment_template_url: a.assignment_template_url,
             kind: 'ASSIGNMENT' as const,
-            club: resolveClub(a, byId, myClub),
+            club: a.club_id ? (byId.get(a.club_id) ?? myClub) : myClub,
           };
         })
         .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.date));
@@ -246,7 +238,7 @@ export const ScheduleDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [profile?.univ_name]);
+  }, [profile?.id]);
 
   useEffect(() => {
     void loadAll();
