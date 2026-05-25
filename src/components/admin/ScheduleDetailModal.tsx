@@ -4,7 +4,7 @@ import {
   X, Calendar, MapPin, QrCode,
   Pencil, Trash2, BookOpen, Save, Loader2,
   Plus, CheckCircle2, AlertCircle, UploadCloud, File as FileIcon,
-  ToggleLeft, ToggleRight,
+  ToggleLeft, ToggleRight, Users, Check,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +30,13 @@ interface Project {
   id: string;
   title: string;
   emoji?: string;
+}
+
+interface ClubMember {
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  email: string | null;
 }
 
 interface Props {
@@ -70,7 +77,7 @@ export function ScheduleDetailModal({ schedule: initialSchedule, onClose, onQR, 
   const { profile, activeClubId } = useAuth();
 
   const [schedule, setSchedule] = useState<ScheduleDetail>(initialSchedule);
-  const [mode, setMode] = useState<'view' | 'edit' | 'assign'>('view');
+  const [mode, setMode] = useState<'view' | 'edit' | 'assign' | 'members'>('view');
 
   /* Edit form */
   const [editForm, setEditForm] = useState({
@@ -98,6 +105,78 @@ export function ScheduleDetailModal({ schedule: initialSchedule, onClose, onQR, 
   const [relatedIds, setRelatedIds] = useState<string[]>(initialSchedule.related_project_ids ?? []);
   const [projectPickerOpen,     setProjectPickerOpen]     = useState(false);
   const [editProjectPickerOpen, setEditProjectPickerOpen] = useState(false);
+
+  /* Member assignment */
+  const [clubMembers,     setClubMembers]     = useState<ClubMember[]>([]);
+  const [membersLoaded,   setMembersLoaded]   = useState(false);
+  const [assignToAll,     setAssignToAll]     = useState(true);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [assignSaving,    setAssignSaving]    = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'members' || membersLoaded || !activeClubId) return;
+    (async () => {
+      // 클럽 멤버 로드
+      const { data: mData } = await supabase
+        .from('club_members')
+        .select('user_id, role, profiles(full_name, email)')
+        .eq('club_id', activeClubId);
+      type RawM = { user_id: string; role: string; profiles: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null };
+      const members: ClubMember[] = ((mData ?? []) as unknown as RawM[]).map(m => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        return { user_id: m.user_id, role: m.role, full_name: p?.full_name ?? null, email: p?.email ?? null };
+      });
+      setClubMembers(members);
+
+      // 기존 지정 현황 로드
+      const { data: aData } = await supabase
+        .from('schedule_assignments')
+        .select('user_id')
+        .eq('schedule_id', schedule.id);
+      if (aData && aData.length > 0) {
+        setAssignToAll(false);
+        setSelectedUserIds(new Set((aData as { user_id: string }[]).map(a => a.user_id)));
+      } else {
+        setAssignToAll(true);
+        setSelectedUserIds(new Set());
+      }
+      setMembersLoaded(true);
+    })();
+  }, [mode, membersLoaded, activeClubId, schedule.id]);
+
+  const handleSaveAssignments = async () => {
+    setAssignSaving(true);
+    try {
+      // 기존 지정 전부 삭제
+      await supabase.from('schedule_assignments').delete().eq('schedule_id', schedule.id);
+
+      if (!assignToAll && selectedUserIds.size > 0) {
+        // 선택된 부원만 insert
+        await supabase.from('schedule_assignments').insert(
+          [...selectedUserIds].map(uid => ({
+            schedule_id: schedule.id,
+            user_id:     uid,
+            club_id:     activeClubId,
+            assigned_by: profile?.id,
+          }))
+        );
+      }
+      showToast(assignToAll ? '전체 부원에게 적용되었습니다.' : `${selectedUserIds.size}명에게 지정되었습니다.`);
+      setMode('view');
+    } catch (e) {
+      alert('저장 실패: ' + (e instanceof Error ? e.message : ''));
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const toggleMember = (uid: string) => {
+    setSelectedUserIds(prev => {
+      const next = new Set(prev);
+      next.has(uid) ? next.delete(uid) : next.add(uid);
+      return next;
+    });
+  };
 
   /* Loading states */
   const [isSaving, setIsSaving] = useState(false);
@@ -279,6 +358,9 @@ export function ScheduleDetailModal({ schedule: initialSchedule, onClose, onQR, 
             {mode === 'assign' && (
               <h2 className="text-base font-black text-black/60">과제 추가</h2>
             )}
+            {mode === 'members' && (
+              <h2 className="text-base font-black text-black/60">부원 지정</h2>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -397,6 +479,12 @@ export function ScheduleDetailModal({ schedule: initialSchedule, onClose, onQR, 
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-black/8 hover:bg-black/15 text-xs font-black text-black transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5" /> 수정
+                </button>
+                <button
+                  onClick={() => { setMembersLoaded(false); setMode('members'); }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-black/8 hover:bg-black/15 text-xs font-black text-black transition-colors"
+                >
+                  <Users className="w-3.5 h-3.5" /> 부원 지정
                 </button>
                 {schedule.type === 'GENERAL' && (
                   <button
@@ -675,6 +763,118 @@ export function ScheduleDetailModal({ schedule: initialSchedule, onClose, onQR, 
             </div>
           )}
 
+          {/* ── MEMBERS MODE ── */}
+          {mode === 'members' && (
+            <div className="px-7 py-5 space-y-4">
+
+              {/* 안내 */}
+              <div className="p-3.5 rounded-2xl bg-black/5 border border-black/10 flex items-start gap-2 text-xs font-medium text-black/60">
+                <Users className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  특정 부원에게만 이 일정·과제를 적용합니다.
+                  <strong className="text-black"> 전체 부원</strong>으로 설정하면 모두에게 보입니다.
+                </span>
+              </div>
+
+              {/* 전체 / 개별 토글 */}
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-black/5 border border-black/10">
+                <div>
+                  <p className="text-sm font-black text-black">전체 부원에게 적용</p>
+                  <p className="text-xs text-black/40 font-medium mt-0.5">
+                    {assignToAll ? '모든 부원이 이 일정을 볼 수 있습니다' : '아래에서 개별 지정합니다'}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setAssignToAll(p => !p)} className="shrink-0 transition-colors">
+                  {assignToAll
+                    ? <ToggleRight className="w-9 h-9 text-black" />
+                    : <ToggleLeft  className="w-9 h-9 text-black/25" />
+                  }
+                </button>
+              </div>
+
+              {/* 멤버 리스트 (전체 아닐 때만) */}
+              {!assignToAll && (
+                <div className="space-y-1.5">
+                  {/* 전체 선택/해제 */}
+                  <div className="flex items-center justify-between px-1 mb-2">
+                    <span className="text-xs font-black text-black/40">
+                      {selectedUserIds.size > 0 ? `${selectedUserIds.size}명 선택됨` : '부원을 선택하세요'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedUserIds.size === clubMembers.length) {
+                          setSelectedUserIds(new Set());
+                        } else {
+                          setSelectedUserIds(new Set(clubMembers.map(m => m.user_id)));
+                        }
+                      }}
+                      className="text-xs font-black text-black/40 hover:text-black transition-colors"
+                    >
+                      {selectedUserIds.size === clubMembers.length ? '전체 해제' : '전체 선택'}
+                    </button>
+                  </div>
+
+                  {/* 운영진 그룹 */}
+                  {clubMembers.filter(m => ['ADMIN','LEADER','CAPTAIN'].includes(m.role)).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black text-black/30 uppercase tracking-widest px-1 mb-1">운영진</p>
+                      {clubMembers.filter(m => ['ADMIN','LEADER','CAPTAIN'].includes(m.role)).map(m => (
+                        <MemberCheckRow
+                          key={m.user_id}
+                          member={m}
+                          checked={selectedUserIds.has(m.user_id)}
+                          onToggle={() => toggleMember(m.user_id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 부원 그룹 */}
+                  {clubMembers.filter(m => !['ADMIN','LEADER','CAPTAIN'].includes(m.role)).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black text-black/30 uppercase tracking-widest px-1 mb-1 mt-3">
+                        부원 ({clubMembers.filter(m => !['ADMIN','LEADER','CAPTAIN'].includes(m.role)).length}명)
+                      </p>
+                      {clubMembers.filter(m => !['ADMIN','LEADER','CAPTAIN'].includes(m.role)).map(m => (
+                        <MemberCheckRow
+                          key={m.user_id}
+                          member={m}
+                          checked={selectedUserIds.has(m.user_id)}
+                          onToggle={() => toggleMember(m.user_id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {clubMembers.length === 0 && !membersLoaded && (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-black/25" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setMode('view')}
+                  className="flex-1 py-3 rounded-2xl border border-black/20 text-sm font-black text-black/50 hover:bg-black/5 transition-colors">
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveAssignments}
+                  disabled={assignSaving || (!assignToAll && selectedUserIds.size === 0)}
+                  className="flex-[2] py-3 rounded-2xl bg-black text-white font-black text-sm
+                             disabled:opacity-40 hover:bg-black/85 transition-all flex items-center justify-center gap-2"
+                >
+                  {assignSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> 저장 중...</>
+                    : <><Users className="w-4 h-4" /> 저장</>
+                  }
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Toast */}
@@ -693,5 +893,60 @@ export function ScheduleDetailModal({ schedule: initialSchedule, onClose, onQR, 
         </AnimatePresence>
       </motion.div>
     </div>
+  );
+}
+
+/* ─────────────────────────────
+   MemberCheckRow
+───────────────────────────── */
+function MemberCheckRow({
+  member, checked, onToggle,
+}: {
+  member: ClubMember;
+  checked: boolean;
+  onToggle: () => void;
+  [key: string]: unknown;
+}) {
+  const isLeader = ['ADMIN', 'LEADER', 'CAPTAIN'].includes(member.role);
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl border transition-all text-left
+        ${checked
+          ? 'border-black bg-black/[0.04] ring-1 ring-black/15'
+          : 'border-black/10 bg-white hover:bg-black/[0.02]'
+        }`}
+    >
+      {/* 체크박스 */}
+      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all
+        ${checked ? 'bg-black border-black' : 'border-black/25'}`}>
+        {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+      </div>
+
+      {/* 아바타 */}
+      <div className="w-8 h-8 rounded-full bg-black/8 flex items-center justify-center shrink-0">
+        <span className="text-xs font-black text-black/50">
+          {(member.full_name ?? '?').slice(0, 1)}
+        </span>
+      </div>
+
+      {/* 이름 + 역할 */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-black text-black truncate">
+            {member.full_name || '이름 미설정'}
+          </span>
+          {isLeader && (
+            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-black text-white shrink-0">
+              Leader
+            </span>
+          )}
+        </div>
+        {member.email && (
+          <p className="text-[11px] text-black/35 font-medium truncate">{member.email}</p>
+        )}
+      </div>
+    </button>
   );
 }
