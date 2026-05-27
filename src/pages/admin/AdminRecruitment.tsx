@@ -108,11 +108,11 @@ function CreateModal({ open, onClose, onSave }: {
   onClose: () => void;
   onSave: (item: Announcement) => void;
 }) {
-  const [clubName,      setClubName]      = useState('CLUB DX');
+  const [clubName,      setClubName]      = useState('');
   const [generation,    setGeneration]    = useState('');
   const [subTitle,      setSubTitle]      = useState('');
   const [coreValue,     setCoreValue]     = useState('');
-  const [category,      setCategory]      = useState('개발');
+  const [category,      setCategory]      = useState('');
   const [content,       setContent]       = useState('');
   const [status,        setStatus]        = useState<Announcement['status']>('active');
   const [appLink,       setAppLink]       = useState('');
@@ -123,8 +123,8 @@ function CreateModal({ open, onClose, onSave }: {
   const [dateStep,      setDateStep]      = useState<'start'|'end'>('start');
   const [thumbPreview,  setThumbPreview]  = useState<string | null>(null);
   const [thumbnail,     setThumbnail]     = useState<File | null>(null);
-  const [requirements,  setRequirements]  = useState(['기초 프로그래밍 경험 (언어 무관)', '매주 정기 세션 참여 가능자', '협업을 좋아하는 분']);
-  const [processSteps,  setProcessSteps]  = useState(['서류 접수', '코딩 테스트 (선택)', '면담', '최종 합격']);
+  const [requirements,  setRequirements]  = useState(['']);
+  const [processSteps,  setProcessSteps]  = useState(['']);
   const [isSubmitting,  setIsSubmitting]  = useState(false);
   const thumbRef = useRef<HTMLInputElement>(null);
 
@@ -136,13 +136,13 @@ function CreateModal({ open, onClose, onSave }: {
   }, [open]);
 
   const reset = () => {
-    setClubName('CLUB DX'); setGeneration(''); setSubTitle(''); setCoreValue('');
-    setCategory('개발'); setContent(''); setStatus('active'); setAppLink('');
+    setClubName(''); setGeneration(''); setSubTitle(''); setCoreValue('');
+    setCategory(''); setContent(''); setStatus('active'); setAppLink('');
     setTagsInput(''); setMemberCount('');
     setStartDate(null); setEndDate(null); setDateStep('start');
     setThumbPreview(null); setThumbnail(null);
-    setRequirements(['기초 프로그래밍 경험 (언어 무관)', '매주 정기 세션 참여 가능자', '협업을 좋아하는 분']);
-    setProcessSteps(['서류 접수', '코딩 테스트 (선택)', '면담', '최종 합격']);
+    setRequirements(['']);
+    setProcessSteps(['']);
   };
   const handleClose = () => { onClose(); reset(); };
 
@@ -458,30 +458,7 @@ function CreateModal({ open, onClose, onSave }: {
    메인 페이지
 ════════════════════════════════════════ */
 export function AdminRecruitment() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([
-    {
-      id: '1', clubName: 'CLUB DX', generation: '12',
-      title: '✨ CLUB DX 12기 신입 부원 모집!',
-      subTitle: '개발과 성장을 함께할 열정적인 당신을 기다립니다!',
-      coreValue: '개발과 성장의 즐거움을 함께할 팀원',
-      content: '저희 동아리와 함께할 열정적인 부원을 모집합니다!',
-      start_date: '2026-03-01', end_date: '2026-03-31', status: 'active',
-      created_at: '2026-03-01', category: '개발', appLink: 'link.com',
-      tags: ['#CLUBDX', '#신입모집', '#개발', '#성장'], memberCount: '10',
-      requirements: ['기초 프로그래밍 경험 (언어 무관)', '매주 정기 세션 참여 가능자', '협업을 좋아하는 분'],
-      processSteps: ['서류 접수', '코딩 테스트 (선택)', '면담', '최종 합격'],
-    },
-    {
-      id: '2', clubName: 'CLUB DX', generation: '11',
-      title: '✨ CLUB DX 11기 디자인 트랙 추가 모집',
-      subTitle: '', coreValue: '',
-      content: 'UI/UX 디자인에 관심 있는 분들을 추가 모집합니다.',
-      start_date: '2026-02-01', end_date: '2026-02-28', status: 'closed',
-      created_at: '2026-02-01', category: '디자인', appLink: '',
-      tags: ['#디자인', '#CLUBDX'], memberCount: '3',
-      requirements: ['UI/UX 디자인 관심자'], processSteps: ['서류 접수', '면담', '최종 합격'],
-    },
-  ]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   const [isCreateOpen, setIsCreateOpen]  = useState(false);
   const [viewingItem,  setViewingItem]   = useState<Announcement | null>(null);
@@ -559,12 +536,11 @@ export function AdminRecruitment() {
     <div className="min-h-screen bg-white pb-24">
 
       {/* ══ 헤더 ══ */}
-      <div className="bg-white text-black pt-12 pb-16 px-6 shadow-sm" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+      <div className="bg-white text-black pt-16 pb-16 px-6 shadow-sm" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
         <div className="max-w-5xl mx-auto">
           <BackButton to="/admin" label="뒤로가기" className="mb-4 text-black/70 hover:text-black" />
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <span className="inline-block mb-3 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-black/15 border border-black/20 text-black">Recruitment</span>
               <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
                 <Megaphone className="w-8 h-8 opacity-90" /> 모집공고 관리
               </h1>

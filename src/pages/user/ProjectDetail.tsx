@@ -59,86 +59,45 @@ const STATUS_MAP: Record<string, ProjectStatus> = {
 };
 
 /* ══════════════════════════════════════════
-   Mock fallback
-══════════════════════════════════════════ */
-const MOCK_PROJECTS: Record<string, Omit<ProjectData, 'id'>> = {
-  '1': {
-    clubName: 'Club DX 개발팀', clubEmoji: '💻',
-    title: '메인 앱 개발', emoji: '📱',
-    status: '진행중', views: 1240, isHot: true,
-    description: '동아리 운영을 위한 올인원 플랫폼 개발 프로젝트입니다.',
-    detail: `Club DX 메인 앱은 동아리 회원 관리, 출결, 과제, 일정, 모집 공고 등 모든 운영 업무를 하나의 앱에서 처리할 수 있도록 설계된 풀스택 웹 서비스입니다.\n\nReact + TypeScript 프론트엔드, Supabase 백엔드를 기반으로 개발 중이며, 현재 관리자 대시보드와 멤버 포털을 구현하고 있습니다.`,
-    tags: ['React', 'TypeScript', 'Supabase', 'Tailwind CSS', 'Framer Motion'],
-    team: [
-      { id: 'a', name: '김철수', role: 'Lead Developer',  clubName: 'Club DX 개발팀', isLeader: true },
-      { id: 'b', name: '이영희', role: 'Frontend Dev',    clubName: 'Club DX 개발팀' },
-      { id: 'c', name: '박민준', role: 'UI/UX Designer',  clubName: '크리에이티브 디자인' },
-    ],
-    startDate: '2025.09',
-    githubUrl: 'https://github.com/example/clubdx',
-    demoUrl: 'https://clubdx.app',
-    leaderEmail: 'lead@clubdx.app',
-  },
-  '2': {
-    clubName: '크리에이티브 디자인', clubEmoji: '🎨',
-    title: '브랜딩 리뉴얼', emoji: '🎯',
-    status: '완료', views: 873, isHot: true,
-    description: '동아리 전체 브랜드 아이덴티티를 새롭게 설계한 프로젝트입니다.',
-    detail: `Club DX의 로고, 컬러 시스템, 타이포그래피를 전면 리뉴얼한 브랜딩 프로젝트입니다.\n\n기존의 복잡한 디자인 요소를 정리하고, 개발팀과 디자인팀이 함께 협업하여 일관성 있는 Design Token 시스템을 구축했습니다.`,
-    tags: ['Figma', 'Brand Design', 'Design System', 'Illustration'],
-    team: [
-      { id: 'd', name: '윤서연', role: 'Brand Designer', clubName: '크리에이티브 디자인', isLeader: true },
-      { id: 'e', name: '한소희', role: 'UI Designer',    clubName: '크리에이티브 디자인' },
-    ],
-    startDate: '2025.06', endDate: '2025.12',
-    demoUrl: 'https://figma.com/example',
-    leaderEmail: 'design@clubdx.app',
-  },
-  '3': {
-    clubName: '마케팅 보이즈', clubEmoji: '📣',
-    title: '신입 온보딩 자동화', emoji: '🤖',
-    status: '준비중', views: 542, isHot: false,
-    description: '신입 부원 온보딩 프로세스를 자동화하는 시스템 개발 프로젝트입니다.',
-    detail: `매 기수마다 반복되는 신입 부원 안내 메시지, 자료 배포, OT 일정 공유 등의 작업을 자동화하는 프로젝트입니다.\n\nSlack Bot + Notion API + Supabase를 연동해 구현할 예정입니다.`,
-    tags: ['Slack API', 'Notion API', 'Node.js', 'Automation'],
-    team: [
-      { id: 'f', name: '정현우', role: 'Project Lead', clubName: '마케팅 보이즈', isLeader: true },
-    ],
-    startDate: '2026.04',
-    leaderEmail: 'onboard@clubdx.app',
-  },
-};
-
-/* ══════════════════════════════════════════
    DB row → ProjectData
 ══════════════════════════════════════════ */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildFromDB(row: any, participants: TeamMember[]): ProjectData {
-  const mock = MOCK_PROJECTS[String(row.id)];
+interface ProjectDBRow {
+  id: string | number;
+  title: string | null;
+  description: string | null;
+  image_url?: string | null;
+  link?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  github_url?: string | null;
+  demo_url?: string | null;
+  leader_email?: string | null;
+  member_count?: number | null;
+  clubs: { id: string; name: string; category?: string | null } | { id: string; name: string; category?: string | null }[] | null;
+}
+
+function buildFromDB(row: ProjectDBRow, participants: TeamMember[]): ProjectData {
   const clubsData = row.clubs;
-  const clubName = (Array.isArray(clubsData) ? clubsData[0]?.name : clubsData?.name) ?? mock?.clubName ?? '알 수 없음';
-  const status: ProjectStatus = STATUS_MAP[row.status] ?? mock?.status ?? '진행중';
+  const clubName = (Array.isArray(clubsData) ? clubsData[0]?.name : clubsData?.name) ?? '알 수 없음';
 
   return {
     id:          String(row.id),
     clubName,
-    clubEmoji:   mock?.clubEmoji ?? '📁',
-    title:       row.title       ?? mock?.title       ?? '프로젝트',
-    emoji:       mock?.emoji     ?? '📁',
-    status,
-    views:       row.views       ?? mock?.views       ?? 0,
-    isHot:       (row.views      ?? 0) >= 500,
-    description: row.description ?? mock?.description ?? '',
-    detail:      mock?.detail    ?? row.description   ?? '',
-    tags:        Array.isArray(row.tech_stack) && row.tech_stack.length > 0
-                   ? row.tech_stack
-                   : mock?.tags ?? [],
-    team:        participants.length > 0 ? participants : mock?.team ?? [],
-    startDate:   row.start_date  ? row.start_date.slice(0, 7).replace('-', '.') : (mock?.startDate ?? ''),
-    endDate:     row.end_date    ? row.end_date.slice(0, 7).replace('-', '.')   : mock?.endDate,
-    githubUrl:   row.github_url  ?? mock?.githubUrl,
-    demoUrl:     row.demo_url    ?? mock?.demoUrl,
-    leaderEmail: row.leader_email ?? mock?.leaderEmail,
+    clubEmoji:   '📁',
+    title:       row.title       ?? '프로젝트',
+    emoji:       '📁',
+    status:      '진행중',
+    views:       0,
+    isHot:       false,
+    description: row.description ?? '',
+    detail:      row.description ?? '',
+    tags:        [],
+    team:        participants,
+    startDate:   row.start_date  ? row.start_date.slice(0, 7).replace('-', '.') : '',
+    endDate:     row.end_date    ? row.end_date.slice(0, 7).replace('-', '.')   : undefined,
+    githubUrl:   row.github_url  ?? undefined,
+    demoUrl:     row.demo_url    ?? undefined,
+    leaderEmail: row.leader_email ?? undefined,
   };
 }
 
@@ -165,7 +124,7 @@ export function ProjectDetail() {
       try {
         const { data: row, error } = await supabase
           .from('projects')
-          .select('id, title, description, image_url, views, status, tech_stack, start_date, end_date, github_url, demo_url, leader_email, clubs(id, name, category)')
+          .select('id, title, description, image_url, link, start_date, end_date, github_url, demo_url, leader_email, member_count, clubs(id, name, category)')
           .eq('id', projectId)
           .maybeSingle();
 
@@ -175,34 +134,38 @@ export function ProjectDetail() {
         try {
           const { data: members } = await supabase
             .from('project_members')
-            .select('id, role, is_leader, profiles(id, full_name, avatar_url, univ_name)')
+            .select('id, role, profiles(id, full_name, univ_name, team_name)')
             .eq('project_id', projectId);
 
+          type ProfJoin = { id: string; full_name: string | null; univ_name: string | null; team_name?: string | null };
+          interface MemberRow {
+            id: string;
+            role: string | null;
+            profiles: ProfJoin | ProfJoin[] | null;
+          }
           if (members && members.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            participants = members.map((m: any) => ({
-              id:        m.profiles?.id        ?? m.id,
-              name:      m.profiles?.full_name ?? '멤버',
-              role:      m.role                ?? '팀원',
-              clubName:  m.profiles?.univ_name ?? '',
-              isLeader:  m.is_leader           ?? false,
-              avatar_url: m.profiles?.avatar_url,
-            }));
+            participants = (members as unknown as MemberRow[]).map((m) => {
+              const pRaw = m.profiles;
+              const p = Array.isArray(pRaw) ? pRaw[0] : pRaw;
+              return {
+                id:        p?.id        ?? m.id,
+                name:      p?.full_name ?? '멤버',
+                role:      m.role       ?? '팀원',
+                clubName:  p?.team_name ?? p?.univ_name ?? '',
+                isLeader:  m.role === '팀장',
+              };
+            });
           }
         } catch { /* project_members 테이블이 없을 수도 있음 */ }
 
         if (row) {
-          setProject(buildFromDB(row, participants));
+          setProject(buildFromDB(row as ProjectDBRow, participants));
         } else {
-          const mock = MOCK_PROJECTS[projectId];
-          if (mock) setProject({ id: projectId, ...mock });
-          else setNotFound(true);
+          setNotFound(true);
         }
       } catch (err) {
         console.error(err);
-        const mock = MOCK_PROJECTS[projectId];
-        if (mock) setProject({ id: projectId, ...mock });
-        else setNotFound(true);
+        setNotFound(true);
       } finally {
         setLoading(false);
       }

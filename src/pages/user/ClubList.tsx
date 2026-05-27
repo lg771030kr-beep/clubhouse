@@ -10,7 +10,7 @@ import { BackButton } from '../../components/common/BackButton';
 import { useAuth } from '../../context/AuthContext';
 
 interface ClubSummary {
-  id: number;
+  id: number | string;
   name: string;
   emoji: string;
   field: string;
@@ -22,47 +22,21 @@ interface ClubSummary {
   techStack?: string[];
 }
 
-const ALL_CLUBS: ClubSummary[] = [
-  {
-    id: 1, name: 'Club DX 개발팀', emoji: '💻', field: '개발',
-    members: 42, founded: '2021년 3월', location: '공학관 302호',
-    description: '실전 프로젝트 경험을 쌓고 싶은 개발자들이 모여 웹·앱 서비스를 기획·구현하는 팀. 매주 정기 세션 + 해커톤 진행.',
-    isRecruiting: true, techStack: ['React', 'TypeScript', 'Node.js', 'Supabase'],
-  },
-  {
-    id: 2, name: '크리에이티브 디자인', emoji: '🎨', field: '디자인',
-    members: 28, founded: '2020년 9월', location: '예술관 B104',
-    description: 'UI/UX, 브랜딩, 모션 그래픽을 탐구하는 동아리. 포트폴리오 리뷰 & 실전 Figma 워크숍 중심.',
-    isRecruiting: true, techStack: ['Figma', 'Adobe XD', 'After Effects'],
-  },
-  {
-    id: 3, name: '마케팅 보이즈', emoji: '📣', field: '마케팅',
-    members: 19, founded: '2022년 3월', location: '경영관 201호',
-    description: '브랜드 전략, SNS 마케팅, 데이터 분석을 직접 실행하며 배우는 동아리.',
-    isRecruiting: false, techStack: [],
-  },
-  {
-    id: 4, name: '알고리즘 스터디', emoji: '🧠', field: '개발',
-    members: 15, founded: '2023년 3월', location: '공학관 204호',
-    description: '코딩테스트와 알고리즘 실력을 함께 키우는 스터디 동아리.',
-    isRecruiting: true, techStack: ['Python', 'C++', 'Java'],
-  },
-  {
-    id: 5, name: '창업 스타터', emoji: '🚀', field: '창업',
-    members: 22, founded: '2021년 9월', location: '혁신관 101호',
-    description: '아이디어를 실제 사업으로 만들어가는 창업 동아리.',
-    isRecruiting: false, techStack: [],
-  },
-  {
-    id: 6, name: '게임 크리에이터', emoji: '🎮', field: '개발',
-    members: 31, founded: '2019년 3월', location: '공학관 501호',
-    description: 'Unity·Unreal 기반 인디 게임을 제작하는 동아리. 연 2회 게임 전시회 및 글로벌 게임잼 참가.',
-    isRecruiting: true, techStack: ['Unity', 'C#', 'Unreal Engine'],
-  },
-];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapClub(c: any): ClubSummary {
+interface ClubRow {
+  id: number | string;
+  name: string | null;
+  category?: string | null;
+  logo_url?: string | null;
+  member_count?: number | null;
+  founded_at?: string | null;
+  location?: string | null;
+  description?: string | null;
+  is_recruiting?: boolean | null;
+  tech_stack?: string[] | null;
+}
+
+function mapClub(c: ClubRow): ClubSummary {
   return {
     id:          c.id,
     name:        c.name ?? '알 수 없음',
@@ -77,14 +51,20 @@ function mapClub(c: any): ClubSummary {
   };
 }
 
-const CATEGORIES = ['전체', '개발', '디자인', '마케팅', '창업'];
+const CATEGORIES = ['전체', '문화/예술/공연', '봉사/사회활동', '학술/교양', '창업/취업', '어학', '체육', '친목', '기타'];
 
 export function ClubList() {
   const navigate = useNavigate();
   const { isAdminMode } = useAuth();
+
+  // 동아리 찾기는 부원 모드에서만 접근 가능
+  useEffect(() => {
+    if (isAdminMode) navigate('/admin', { replace: true });
+  }, [isAdminMode]);
+
   const [query,    setQuery]    = useState('');
   const [category, setCategory] = useState('전체');
-  const [clubs, setClubs]       = useState<ClubSummary[]>(ALL_CLUBS);
+  const [clubs, setClubs]       = useState<ClubSummary[]>([]);
 
   // ── 테마 토큰 ──────────────────────────────────────────
   const bg         = isAdminMode ? 'bg-white'         : 'bg-black';
@@ -112,7 +92,7 @@ export function ClubList() {
         .from('clubs')
         .select('id, name, category, logo_url, is_recruiting, description, member_count, location, tech_stack')
         .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) setClubs(data.map(mapClub));
+      if (!error && data) setClubs((data as ClubRow[]).map(mapClub));
     }
     loadClubs();
   }, []);

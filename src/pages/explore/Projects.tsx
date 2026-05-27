@@ -23,43 +23,6 @@ interface ProjectCard {
   imageUrl?: string;
 }
 
-/* ── 목 데이터 (Supabase 폴백) ── */
-const MOCK_PROJECTS: ProjectCard[] = [
-  {
-    id: 'm1', title: '캠퍼스 맛집 지도', description: '학교 주변 맛집을 공유하고 리뷰를 남기는 웹 서비스. React + Supabase로 구현.',
-    clubName: 'Club DX 개발팀', clubEmoji: '💻', status: 'ongoing',
-    techStack: ['React', 'TypeScript', 'Supabase'], memberCount: 5,
-    githubUrl: 'https://github.com',
-  },
-  {
-    id: 'm2', title: '동아리 홍보 리플렛 시스템', description: 'Figma 기반 자동 홍보물 생성 도구. 템플릿 선택 후 정보를 입력하면 PDF로 출력.',
-    clubName: '크리에이티브 디자인', clubEmoji: '🎨', status: 'completed',
-    techStack: ['Figma', 'Framer'], memberCount: 3,
-  },
-  {
-    id: 'm3', title: '인디 RPG 게임', description: 'Unity로 제작 중인 2D 픽셀 RPG. 스토리 기반 퀘스트 시스템과 멀티플레이 지원 예정.',
-    clubName: '게임 크리에이터', clubEmoji: '🎮', status: 'ongoing',
-    techStack: ['Unity', 'C#'], memberCount: 8,
-    githubUrl: 'https://github.com',
-  },
-  {
-    id: 'm4', title: 'SNS 마케팅 대시보드', description: '인스타그램·트위터 계정 통합 분석 툴. 클릭 수, 노출 수, 전환율을 시각화.',
-    clubName: '마케팅 보이즈', clubEmoji: '📣', status: 'planning',
-    techStack: ['Python', 'Streamlit'], memberCount: 4,
-  },
-  {
-    id: 'm5', title: '알고리즘 스터디 플랫폼', description: '문제 풀이 현황 공유 + 코드 리뷰 게시판. 백준·프로그래머스 API 연동.',
-    clubName: '알고리즘 스터디', clubEmoji: '🧠', status: 'ongoing',
-    techStack: ['Next.js', 'PostgreSQL'], memberCount: 6,
-    link: 'https://example.com',
-  },
-  {
-    id: 'm6', title: '창업 아이디어 공유 앱', description: '팀원 모집부터 MVP 검증까지. 아이디어 피드 + 투표 기능 탑재.',
-    clubName: '창업 스타터', clubEmoji: '🚀', status: 'completed',
-    techStack: ['Flutter', 'Firebase'], memberCount: 7,
-  },
-];
-
 /* ── 상태 배지 ── */
 const statusInfo: Record<ProjectCard['status'], { label: string; cls: string }> = {
   ongoing:   { label: '진행중',   cls: 'bg-white text-black' },
@@ -69,8 +32,21 @@ const statusInfo: Record<ProjectCard['status'], { label: string; cls: string }> 
 
 const STATUS_FILTERS = ['전체', '진행중', '완료', '기획중'] as const;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapProject(p: any): ProjectCard {
+interface ProjectRow {
+  id: string | number;
+  title: string | null;
+  description: string | null;
+  status: string | null;
+  tech_stack: string[] | null;
+  member_count: number | null;
+  link: string | null;
+  demo_url: string | null;
+  github_url: string | null;
+  image_url: string | null;
+  clubs: { name: string } | { name: string }[] | null;
+}
+
+function mapProject(p: ProjectRow): ProjectCard {
   const statusMap: Record<string, ProjectCard['status']> = {
     ONGOING: 'ongoing', COMPLETED: 'completed', PLANNING: 'planning',
     ongoing: 'ongoing', completed: 'completed', planning: 'planning',
@@ -79,7 +55,7 @@ function mapProject(p: any): ProjectCard {
     id:          p.id,
     title:       p.title        ?? '이름 없음',
     description: p.description  ?? '',
-    clubName:    p.clubs?.name  ?? '동아리',
+    clubName:    (Array.isArray(p.clubs) ? p.clubs[0]?.name : p.clubs?.name) ?? '동아리',
     clubEmoji:   '🏢',
     status:      statusMap[p.status ?? 'ongoing'] ?? 'ongoing',
     techStack:   Array.isArray(p.tech_stack) ? p.tech_stack : [],
@@ -95,7 +71,7 @@ function mapProject(p: any): ProjectCard {
 ════════════════════════════════════════════════ */
 export function Projects() {
   const navigate = useNavigate();
-  const [projects,  setProjects]  = useState<ProjectCard[]>(MOCK_PROJECTS);
+  const [projects,  setProjects]  = useState<ProjectCard[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [query,     setQuery]     = useState('');
   const [statusFilter, setStatusFilter] = useState<typeof STATUS_FILTERS[number]>('전체');
@@ -108,10 +84,10 @@ export function Projects() {
           .from('projects')
           .select('id, title, description, status, tech_stack, member_count, link, github_url, demo_url, image_url, clubs(name)')
           .order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-          setProjects(data.map(mapProject));
+        if (!error && data) {
+          setProjects((data as ProjectRow[]).map(mapProject));
         }
-      } catch { /* 목 데이터 유지 */ } finally {
+      } catch { /* 빈 목록 유지 */ } finally {
         setLoading(false);
       }
     }
@@ -196,9 +172,11 @@ export function Projects() {
         {/* ── 결과 없음 ── */}
         {!loading && filtered.length === 0 && (
           <div className="bg-black rounded-3xl border border-white/10 py-16 text-center">
-            <p className="text-3xl mb-3">🔍</p>
-            <p className="text-white font-bold text-sm">검색 결과가 없습니다</p>
-            <p className="text-white/40 text-xs mt-1">다른 키워드로 검색해 보세요</p>
+            <p className="text-3xl mb-3">{query ? '🔍' : '📭'}</p>
+            <p className="text-white font-bold text-sm">
+              {query ? '검색 결과가 없습니다' : '등록된 프로젝트가 없습니다'}
+            </p>
+            {query && <p className="text-white/40 text-xs mt-1">다른 키워드로 검색해 보세요</p>}
           </div>
         )}
 

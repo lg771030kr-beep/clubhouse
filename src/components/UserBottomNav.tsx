@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Megaphone, Rocket, User } from 'lucide-react';
+import { LayoutDashboard, Compass, Activity } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -9,17 +9,15 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const items = [
-  { to: '/dashboard', label: '홈', icon: LayoutDashboard },
-  { to: '/portfolio', label: '포트폴리오', icon: Activity },
-  { to: '/explore/recruitment', label: '모집', icon: Megaphone },
-  { to: '/explore/projects', label: '프로젝트', icon: Rocket },
-  { to: '/profile', label: '프로필', icon: User },
+  { to: '/portfolio',          label: '내 활동',      icon: Activity },
+  { to: '/dashboard',          label: '홈',           icon: LayoutDashboard },
+  { to: '/explore/activities', label: '다른 활동 찾기', icon: Compass },
 ] as const;
 
 export const UserBottomNav: React.FC = () => {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/8 bg-black/95 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md md:hidden"
       aria-label="주요 메뉴"
     >
       <ul className="flex items-stretch justify-around gap-0 px-1 py-1.5">
@@ -30,7 +28,9 @@ export const UserBottomNav: React.FC = () => {
               className={({ isActive }) =>
                 cn(
                   'flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 text-[10px] font-bold transition-colors',
-                  isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-500 hover:text-slate-800'
+                  isActive
+                    ? 'text-white bg-white/10'
+                    : 'text-white/40 hover:text-white/70'
                 )
               }
             >

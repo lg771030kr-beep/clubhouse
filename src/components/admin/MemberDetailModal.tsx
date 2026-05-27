@@ -117,17 +117,33 @@ export function MemberDetailModal({ userId, onClose }: MemberDetailModalProps) {
         // 1. 프로필
         const { data: prof } = await supabase
           .from('profiles')
-          .select('full_name, email, role, created_at, university, team_name')
+          .select('full_name, email, role, created_at, univ_name, team_name')
           .eq('id', userId)
           .single();
 
+        interface ProfileRow {
+          full_name: string | null; email: string | null; role: string | null;
+          created_at: string | null; univ_name: string | null; team_name: string | null;
+        }
+        type SchedJoin = { title: string | null; date: string | null };
+        interface AttendanceWithSchedule {
+          status: string; marked_at: string | null;
+          schedules: SchedJoin | SchedJoin[] | null;
+        }
+        type AssignJoin = { title: string | null; due_date: string | null };
+        interface SubmissionWithAssignment {
+          submitted_at: string | null; score: number | null;
+          assignments: AssignJoin | AssignJoin[] | null;
+        }
+
         if (prof) {
+          const p = prof as ProfileRow;
           setMember({
-            name:     (prof as any).full_name ?? '멤버',
-            email:    (prof as any).email     ?? '',
-            role:     ((prof as any).role?.toUpperCase() as MemberProfile['role']) ?? 'USER',
-            joinedAt: (prof as any).created_at ? String((prof as any).created_at).substring(0, 10) : '',
-            team:     (prof as any).university ?? (prof as any).team_name ?? '',
+            name:     p.full_name ?? '멤버',
+            email:    p.email     ?? '',
+            role:     (p.role?.toUpperCase() as MemberProfile['role']) ?? 'USER',
+            joinedAt: p.created_at ? p.created_at.substring(0, 10) : '',
+            team:     p.team_name ?? p.univ_name ?? '',
           });
         }
 
@@ -141,14 +157,17 @@ export function MemberDetailModal({ userId, onClose }: MemberDetailModalProps) {
 
         if (attData && attData.length > 0) {
           const statusMap: Record<string, AttendStatus> = { PRESENT: '출석', LATE: '지각', ABSENT: '결석' };
-          setAttendRecords((attData as any[]).map(r => ({
-            date:    r.schedules?.date  ?? '',
-            session: r.schedules?.title ?? '일정',
-            status:  statusMap[r.status] ?? '결석',
-            time:    r.marked_at
-              ? new Date(r.marked_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
-              : null,
-          })));
+          setAttendRecords((attData as unknown as AttendanceWithSchedule[]).map(r => {
+            const sched = Array.isArray(r.schedules) ? r.schedules[0] : r.schedules;
+            return {
+              date:    sched?.date  ?? '',
+              session: sched?.title ?? '일정',
+              status:  statusMap[r.status] ?? '결석',
+              time:    r.marked_at
+                ? new Date(r.marked_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+                : null,
+            };
+          }));
         }
 
         // 3. 과제 제출 현황 (submissions 테이블 optional)
@@ -160,15 +179,18 @@ export function MemberDetailModal({ userId, onClose }: MemberDetailModalProps) {
             .order('submitted_at', { ascending: false });
 
           if (!subErr && subData && subData.length > 0) {
-            setAssignRecords((subData as any[]).map(s => ({
-              title:       s.assignments?.title    ?? '과제',
-              dueDate:     s.assignments?.due_date ?? '',
-              isSubmitted: true,
-              submittedAt: s.submitted_at
-                ? String(s.submitted_at).substring(0, 16).replace('T', ' ')
-                : null,
-              score: s.score ?? null,
-            })));
+            setAssignRecords((subData as unknown as SubmissionWithAssignment[]).map(s => {
+              const assign = Array.isArray(s.assignments) ? s.assignments[0] : s.assignments;
+              return {
+                title:       assign?.title    ?? '과제',
+                dueDate:     assign?.due_date ?? '',
+                isSubmitted: true,
+                submittedAt: s.submitted_at
+                  ? s.submitted_at.substring(0, 16).replace('T', ' ')
+                  : null,
+                score: s.score ?? null,
+              };
+            }));
           }
         } catch { /* submissions 테이블 없음 — 빈 상태 유지 */ }
 

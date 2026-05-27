@@ -34,7 +34,7 @@ const getRoleStyle = (role: string) =>
    Profile Page
 ══════════════════════════════════════════ */
 export function Profile() {
-  const { profile } = useAuth();
+  const { profile, isSuperAdmin } = useAuth();
   const navigate    = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -57,11 +57,20 @@ export function Profile() {
       setIsClubLoading(true);
       try {
         const { data, error } = await supabase
-          .from('members')
+          .from('club_members')
           .select('role, clubs(id, name, logo_url, category)')
           .eq('user_id', profile.id);
         if (error) throw error;
-        setMemberships((data as ClubMembership[]) || []);
+        // clubs는 객체(단일)로 반환되므로 타입 보정
+        interface ClubMemberRow {
+          role: string;
+          clubs: ClubMembership['clubs'] | ClubMembership['clubs'][];
+        }
+        const normalized = ((data ?? []) as ClubMemberRow[]).map((row) => ({
+          role:  row.role,
+          clubs: Array.isArray(row.clubs) ? row.clubs[0] ?? null : row.clubs,
+        }));
+        setMemberships(normalized as ClubMembership[]);
       } catch (err) {
         console.warn('[Profile] members fetch 실패 — 폴백 사용:', err);
         if (profile.univ_name) {
@@ -270,6 +279,29 @@ export function Profile() {
             </div>
           )}
         </motion.section>
+
+        {/* 슈퍼어드민 진입 버튼 — is_super_admin 계정만 표시 */}
+        {isSuperAdmin && (
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <button
+              onClick={() => navigate('/super-admin')}
+              className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/8 transition-colors group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5 text-black" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-black text-white">슈퍼어드민</p>
+                <p className="text-[11px] text-white/40">플랫폼 전체 관리</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors" />
+            </button>
+          </motion.section>
+        )}
 
       </div>
 

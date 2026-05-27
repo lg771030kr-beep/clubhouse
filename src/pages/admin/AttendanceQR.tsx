@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Users, CheckCircle2, ChevronDown, CalendarDays, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 /* ══════════════════════════════════════════
    Types
@@ -16,6 +17,7 @@ interface TodaySchedule {
   title: string;
   time: string | null;
   type: string;
+  qr_code_token: string | null;
 }
 
 /* ══════════════════════════════════════════
@@ -37,6 +39,7 @@ function fmtTime(t: string | null): string {
 ══════════════════════════════════════════ */
 export function AttendanceQR({ scheduleId, onClose }: AttendanceQRProps) {
   const today = useMemo(() => todayYMD(), []);
+  const { activeClubId } = useAuth();
 
   /* ── 오늘 일정 목록 ── */
   const [todaySchedules, setTodaySchedules] = useState<TodaySchedule[]>([]);
@@ -50,34 +53,37 @@ export function AttendanceQR({ scheduleId, onClose }: AttendanceQRProps) {
   const [totalMembers, setTotalMembers] = useState(0);
   const [isEnded, setIsEnded] = useState(false);
 
-  /* ────── 오늘 일정 로드 ────── */
+  /* ────── 오늘 일정 로드 (이 동아리 것만) ────── */
   useEffect(() => {
     async function loadToday() {
       setLoadingSchedules(true);
-      const { data } = await supabase
+      let query = supabase
         .from('schedules')
-        .select('id, title, time, type')
+        .select('id, title, time, type, qr_code_token')
         .eq('is_approved', true)
         .eq('date', today)
-        .order('time');                 // 시간순 정렬 (null 마지막)
+        .order('time');
+      if (activeClubId) query = query.eq('club_id', activeClubId);
 
+      const { data } = await query;
       const list = (data as TodaySchedule[] | null) ?? [];
       setTodaySchedules(list);
 
-      // prop으로 넘어온 scheduleId가 없으면 오늘 첫 번째 일정 자동 선택
       if (!scheduleId && list.length > 0) setActiveId(list[0].id);
       setLoadingSchedules(false);
     }
     loadToday();
-  }, [today, scheduleId]);
+  }, [today, scheduleId, activeClubId]);
 
-  /* ────── 전체 멤버 수 로드 ────── */
+  /* ────── 동아리 멤버 수 로드 ────── */
   useEffect(() => {
+    if (!activeClubId) return;
     supabase
-      .from('profiles')
+      .from('club_members')
       .select('*', { count: 'exact', head: true })
+      .eq('club_id', activeClubId)
       .then(({ count }) => { if (count !== null) setTotalMembers(count); });
-  }, []);
+  }, [activeClubId]);
 
   /* ────── 출석 수 + Realtime ────── */
   useEffect(() => {
@@ -118,15 +124,26 @@ export function AttendanceQR({ scheduleId, onClose }: AttendanceQRProps) {
     return () => { supabase.removeChannel(channel); };
   }, [activeId]);
 
-  /* ────── QR 데이터 (v2 — 날짜 바인딩) ────── */
-  const qrValue = useMemo(() => JSON.stringify({
-    v:           2,            // 버전 2: 날짜 검증 포함
-    schedule_id: activeId,     // 일정 고유 ID
-    date:        today,        // YYYY-MM-DD — 오늘만 유효
-  }), [activeId, today]);
-
-  /* ────── 선택된 일정 정보 ────── */
+  /* ────── QR 데이터 (v3 — qr_code_token 사용) ──────
+   * schedule_id(UUID) 대신 qr_code_token(랜덤 토큰)을 embed:
+   *   - schedule_id 직접 노출 방지 → 스캐너가 토큰으로 일정 조회
+   *   - date 바인딩 유지 → 오늘 날짜 QR만 유효
+   * qr_code_token 이 없으면 v2 방식 fallback
+   */
   const activeSched = todaySchedules.find(s => s.id === activeId) ?? null;
+  const qrValue = useMemo(() => {
+    if (activeSched?.qr_code_token) {
+      return JSON.stringify({
+        v:     3,
+        token: activeSched.qr_code_token,   // 랜덤 토큰 — schedule_id 미노출
+        date:  today,
+      });
+    }
+    // fallback: qr_code_token 미존재 시 기존 v2
+    return JSON.stringify({ v: 2, schedule_id: activeId, date: today });
+  }, [activeSched, activeId, today]);
+
+  /* ────── 선택된 일정 정보 (qrValue useMemo 내부에서 선언, 여기선 재선언 불필요) ────── */
 
   /* ════════════════════════════════════════
      Render
@@ -137,11 +154,6 @@ export function AttendanceQR({ scheduleId, onClose }: AttendanceQRProps) {
 
         {/* ── 헤더 ── */}
         <div className="relative z-10 px-6 pt-8 pb-5 text-black text-center border-b border-black/10">
-          <span className="bg-black text-white px-3 py-1
-                           rounded-full text-xs font-black tracking-widest uppercase mb-3
-                           inline-block">
-            ATTENDANCE QR
-          </span>
           <h1 className="text-2xl font-black tracking-tight text-black">출석 체크 진행 중</h1>
           <p className="text-black/60 mt-1 text-sm font-medium">
             부원들이 QR 코드를 스캔하도록 안내해주세요.

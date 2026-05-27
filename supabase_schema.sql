@@ -3,7 +3,7 @@
 -- ===============================================================
 
 -- 1. Create Custom Types (Enums)
-CREATE TYPE user_role AS ENUM ('ADMIN', 'USER');
+CREATE TYPE user_role AS ENUM ('ADMIN', 'USER', 'LEADER');
 CREATE TYPE schedule_type AS ENUM ('GENERAL', 'ASSIGNMENT');
 CREATE TYPE attendance_status AS ENUM ('PRESENT', 'ABSENT');
 
