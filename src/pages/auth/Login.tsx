@@ -2,21 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { SocialLoginButtons } from '../../components/auth/SocialLoginButtons';
+
+type MemberType = 'personal' | 'corp';
 
 export const Login: React.FC = () => {
   const { signIn, user, loading: authLoading, hasClub } = useAuth();
   const navigate = useNavigate();
 
+  const [memberType, setMemberType] = useState<MemberType>('personal');
   const [email,      setEmail]      = useState('');
   const [password,   setPassword]   = useState('');
   const [error,      setError]      = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   /**
-   * ★ 핵심 수정: navigate를 handleSubmit에서 제거하고 여기서만 처리
-   *    signIn() 직후 navigate하면 onAuthStateChange가 아직 안 터진 상태(loading=false, hasClub=false)
-   *    이므로 Dashboard가 /welcome으로 튕긴다.
-   *    authLoading이 false가 된 뒤 user 확인 → 그때 navigate.
+   * signIn() 직후 navigate 금지 — onAuthStateChange 완료 후 여기서만 처리
    */
   useEffect(() => {
     if (!authLoading && user) {
@@ -24,19 +25,24 @@ export const Login: React.FC = () => {
     }
   }, [authLoading, user, hasClub, navigate]);
 
+  const handleTypeSwitch = (type: MemberType) => {
+    setMemberType(type);
+    setError('');
+    setEmail('');
+    setPassword('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
     try {
       await signIn(email, password);
-      // navigate는 위 useEffect가 처리 — 여기서 navigate 호출 금지
+      // navigate는 useEffect가 처리 — 여기서 호출 금지
     } catch {
-      // 내부 에러 메시지(DB 구조, 스택 트레이스 등) 노출 방지
       setError('이메일 또는 비밀번호가 올바르지 않습니다.');
       setSubmitting(false);
     }
-    // finally에서 setSubmitting(false) 하지 않음 — navigate 전까지 스피너 유지
   };
 
   return (
@@ -44,12 +50,30 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-sm">
 
         {/* 로고 */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-white rounded-2xl mb-4 shadow-lg">
             <span className="text-black font-black text-xl">DX</span>
           </div>
           <h1 className="text-white font-black text-2xl tracking-tight">Club DX</h1>
           <p className="text-white/50 text-sm mt-1">동아리 관리 플랫폼</p>
+        </div>
+
+        {/* 회원 유형 토글 */}
+        <div className="flex bg-white/[0.07] rounded-xl p-1 mb-6">
+          {(['personal', 'corp'] as MemberType[]).map(type => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => handleTypeSwitch(type)}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                memberType === type
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-white/40 hover:text-white/60'
+              }`}
+            >
+              {type === 'personal' ? '일반회원' : '기업·기관'}
+            </button>
+          ))}
         </div>
 
         {/* 폼 */}
@@ -62,14 +86,16 @@ export const Login: React.FC = () => {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-white/60 text-xs font-semibold tracking-widest uppercase">이메일</label>
+            <label className="text-white/60 text-xs font-semibold tracking-widest uppercase">
+              {memberType === 'personal' ? '학교 이메일' : '업무 이메일'}
+            </label>
             <div className="relative">
               <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="이메일 주소"
+                placeholder={memberType === 'personal' ? '학교 이메일 주소' : '업무용 이메일 주소'}
                 required
                 className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3
                            text-white placeholder-white/25 text-sm outline-none
@@ -108,12 +134,34 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        <p className="text-center text-white/40 text-sm mt-6">
-          아직 계정이 없으신가요?{' '}
-          <Link to="/signup" className="text-white font-semibold hover:underline underline-offset-2">
+        {/* 소셜 로그인 */}
+        <div className="mt-5">
+          <SocialLoginButtons />
+        </div>
+
+        {/* 하단 링크 */}
+        <div className="mt-6 flex items-center justify-center gap-3 text-sm">
+          <Link
+            to={`/signup?type=${memberType}`}
+            className="text-white/50 hover:text-white transition-colors"
+          >
             회원가입
           </Link>
-        </p>
+          <span className="text-white/20">|</span>
+          <Link
+            to={`/find-account?tab=id&type=${memberType}`}
+            className="text-white/50 hover:text-white transition-colors"
+          >
+            아이디 찾기
+          </Link>
+          <span className="text-white/20">|</span>
+          <Link
+            to={`/find-account?tab=pw&type=${memberType}`}
+            className="text-white/50 hover:text-white transition-colors"
+          >
+            비밀번호 찾기
+          </Link>
+        </div>
 
       </div>
     </div>

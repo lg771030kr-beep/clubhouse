@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { ThreeWeekSummaryCard } from './ThreeWeekSummaryCard';
+import { CreateActivityModal } from '../../components/CreateActivityModal';
 
 const fadeUp = {
   hidden:  { opacity: 0, y: 20 },
@@ -35,6 +36,7 @@ export function UserDashboard() {
   const userName = profile?.full_name || '김부원';
 
   const [isScannerOpen,    setIsScannerOpen]    = useState(false);
+  const [showCreateModal,  setShowCreateModal]  = useState(false);
   const [toastMessage,     setToastMessage]     = useState<{ title: string; type: 'success' | 'error' } | null>(null);
   const [clubInfo,         setClubInfo]         = useState<{ id: string; name: string; is_recruiting?: boolean; recruit_link?: string } | null>(null);
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
@@ -277,141 +279,33 @@ export function UserDashboard() {
           {/* ── 구분선 ── */}
           <div className="border-t border-white/8 my-1" />
 
-          {/* ── 팀장/운영진 전용: 일정 제안 (CAPTAIN or LEADER 역할인 경우만 표시) ── */}
+          {/* ── 활동 등록 ── */}
           {eligibleClubs.length > 0 && (
             <motion.section custom={2} variants={fadeUp}>
-              <div className="bg-black rounded-3xl border border-white/10 p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  {/* 가장 높은 권한 배지 표시: LEADER > CAPTAIN */}
-                  {eligibleClubs.some(c => c.role === 'LEADER') ? (
-                    <span className="rounded-full bg-white text-black px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
-                      LEADER
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-white/20 text-white px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
-                      CAPTAIN
-                    </span>
-                  )}
-                  <p className="text-xs font-medium text-white/40">운영진 승인 후 반영됩니다.</p>
-                </div>
-                <motion.button
-                  type="button" onClick={() => setIsAddingSchedule(true)}
-                  whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }}
-                  className="flex w-full items-center justify-center gap-2 bg-white text-black
-                             py-3.5 rounded-2xl text-sm font-black"
-                >
-                  <Plus className="h-4 w-4" />
-                  우리 팀 일정 만들기
-                </motion.button>
-              </div>
+              <motion.button
+                type="button" onClick={() => setShowCreateModal(true)}
+                whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }}
+                className="flex w-full items-center justify-center gap-1.5 bg-white text-black
+                           py-3.5 rounded-2xl text-sm font-black"
+              >
+                <Plus className="h-4 w-4" />
+                활동 등록하기
+              </motion.button>
             </motion.section>
           )}
-
-          {/* ── 모집 중인 동아리 ── */}
-          <motion.section custom={3} variants={fadeUp} className="space-y-3">
-            <div className="flex items-center justify-between px-1">
-              <div>
-                <h2 className="text-base font-black text-white">나랑 어울리는 동아리</h2>
-                <p className="text-[11px] text-white/40 font-medium mt-0.5">현재 모집 중</p>
-              </div>
-              <Link to="/user/recruitments"
-                className="inline-flex items-center gap-1 text-xs font-bold text-white/60 hover:text-white transition-colors">
-                더 보기 <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-
-            {recruitingClubs.length === 0 ? (
-              <div className="bg-black rounded-3xl border border-white/10 py-8 text-center text-xs text-white/30">
-                현재 모집 중인 동아리가 없습니다.
-              </div>
-            ) : (
-              <div className="flex gap-2.5 overflow-x-auto pb-1.5 scrollbar-none">
-                {recruitingClubs.map((club, i) => (
-                  <motion.div
-                    key={club.id} custom={i} variants={fadeUp}
-                    whileHover={{ y: -3, scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                    className="min-w-[148px] max-w-[148px] overflow-hidden rounded-3xl bg-black border border-white/10 cursor-pointer shrink-0"
-                  >
-                    <div className="h-20 w-full bg-white/5">
-                      {club.logo_url
-                        ? <img src={club.logo_url} alt={club.name} className="h-full w-full object-cover" />
-                        : (
-                          <div className="flex h-full items-center justify-center text-2xl">
-                            {club.category === '개발' ? '💻' : club.category === '디자인' ? '🎨' : club.category === '마케팅' ? '📣' : '🚀'}
-                          </div>
-                        )
-                      }
-                    </div>
-                    <div className="p-3 space-y-1">
-                      <p className="line-clamp-1 font-black text-white text-xs">{club.name}</p>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                        <span className="text-[9px] font-black text-white/40 uppercase tracking-wide">모집중</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </motion.section>
-
-          {/* ── 구분선 ── */}
-          <div className="border-t border-white/8 my-1" />
-
-          {/* ── HOT 프로젝트 ── */}
-          <motion.section custom={4} variants={fadeUp} className="space-y-3">
-            <div className="flex items-center justify-between px-1">
-              <div>
-                <h2 className="text-base font-black text-white">요즘 HOT한 프로젝트</h2>
-                <p className="text-[11px] text-white/40 font-medium mt-0.5">조회수 상위</p>
-              </div>
-              <Link to="/projects"
-                className="inline-flex items-center gap-1 text-xs font-bold text-white/60 hover:text-white transition-colors">
-                더 보기 <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-
-            {hotProjects.length === 0 ? (
-              <div className="bg-black rounded-3xl border border-white/10 py-8 text-center text-xs text-white/30">
-                인기 프로젝트 데이터가 없습니다.
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {hotProjects.map((project, i) => (
-                  <motion.div
-                    key={project.id} custom={i} variants={fadeUp}
-                    whileHover={{ x: 3 }} whileTap={{ scale: 0.99 }}
-                    onClick={() => setSelectedProject(project)}
-                    className="bg-black border border-white/10 rounded-3xl cursor-pointer"
-                  >
-                    <div className="flex gap-3.5 p-4">
-                      <div className="h-14 w-20 shrink-0 overflow-hidden rounded-2xl bg-white/8">
-                        {project.image_url
-                          ? <img src={project.image_url} alt={project.title} className="h-full w-full object-cover" />
-                          : <div className="flex h-full items-center justify-center text-xl">📁</div>
-                        }
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 font-black text-white text-sm">{project.title}</p>
-                        <p className="mt-0.5 text-xs font-medium text-white/40">{getProjectClubName(project)}</p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                          <span className="text-[10px] text-white/30 font-medium">조회 {(project.views ?? 0).toLocaleString()}회</span>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-white/20 shrink-0 self-center" />
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </motion.section>
 
         </motion.div>
       </div>
 
       {/* QR 스캐너 */}
       {isScannerOpen && <QRScanner onScanSuccess={handleScanSuccess} onClose={() => setIsScannerOpen(false)} />}
+
+      {/* 활동 만들기 모달 */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <CreateActivityModal onClose={() => setShowCreateModal(false)} />
+        )}
+      </AnimatePresence>
 
       {/* ── 일정 제안 모달 ── */}
       <AnimatePresence>

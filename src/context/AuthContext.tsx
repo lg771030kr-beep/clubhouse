@@ -8,10 +8,13 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   isAdminMode: boolean;
+  isSuperAdmin: boolean;
   hasClub: boolean;
   activeClubId: string | null;
   switchClub: (id: string) => void;
   toggleAdminMode: () => void;
+  enterAdminMode: () => void;   // profile.role 체크 없이 강제 진입 (club_members 기반 리더용)
+  exitAdminMode:  () => void;   // 어드민 모드 강제 종료 (role 무관)
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string, univName?: string, teamName?: string) => Promise<void>;
@@ -25,6 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile,      setProfile]      = useState<UserProfile | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [isAdminMode,  setIsAdminMode]  = useState(false); // 항상 USER 모드로 시작 (규칙 2)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [hasClub,      setHasClub]      = useState(false);
   const [activeClubId, setActiveClubId] = useState<string | null>(null);
 
@@ -35,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setProfile(null);
         setIsAdminMode(false);
+        setIsSuperAdmin(false);
         setHasClub(false);
         setActiveClubId(null);
         setLoading(false);
@@ -67,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setProfile(data as UserProfile);
+      setIsSuperAdmin(!!(data as UserProfile).is_super_admin);
 
       // 1순위: club_members 테이블
       const { data: memberships, error: memErr } = await supabase
@@ -162,11 +168,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAdminMode(prev => !prev);
   };
 
+  /** club_members 기반으로 Leader가 확인된 경우 profile.role 무관하게 어드민 모드 진입 */
+  const enterAdminMode = () => setIsAdminMode(true);
+
+  /** 어드민 모드 강제 종료 — profile.role 무관 */
+  const exitAdminMode = () => setIsAdminMode(false);
+
   return (
     <AuthContext.Provider value={{
-      user, profile, loading, isAdminMode, hasClub,
+      user, profile, loading, isAdminMode, isSuperAdmin, hasClub,
       activeClubId, switchClub,
-      toggleAdminMode, refreshProfile, signIn, signUp, signOut,
+      toggleAdminMode, enterAdminMode, exitAdminMode, refreshProfile, signIn, signUp, signOut,
     }}>
       {children}
     </AuthContext.Provider>

@@ -3,7 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export function ProtectedRoute() {
-  const { profile, loading } = useAuth();
+  const { profile, loading, isAdminMode } = useAuth();
 
   if (loading) {
     return (
@@ -14,8 +14,12 @@ export function ProtectedRoute() {
     );
   }
 
-  // 서버에서 가져온 실제 role로 판단 — 클라이언트 토글 상태(isAdminMode)는 신뢰하지 않음
-  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'LEADER';
+  // profile.role 기반 체크 + enterAdminMode()로 club_members 검증 후 진입한 경우도 허용
+  const isAdmin =
+    profile?.role === 'ADMIN' ||
+    profile?.role === 'LEADER' ||
+    isAdminMode;   // club_members CAPTAIN/LEADER 확인 후 앱 레벨에서 승인된 상태
+
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }

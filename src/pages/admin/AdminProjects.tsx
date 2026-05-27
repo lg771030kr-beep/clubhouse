@@ -4,6 +4,7 @@ import {
   Plus, X, Paperclip, ChevronLeft, ChevronRight,
   Rocket, Clock, CheckCircle2, XCircle, Upload, Search,
   Zap, Users, Hash, Calendar, ChevronDown, Loader2,
+  AlertCircle, Check, Ban, User, Crown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth,
@@ -14,6 +15,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { BackButton } from '../../components/common/BackButton';
 import { EmptyState } from '../../components/common/EmptyState';
+import { AdminCreateProjectModal } from '../../components/admin/AdminCreateProjectModal';
 
 /* ══════════════════════════════════════════
    타입
@@ -55,6 +57,7 @@ interface Project {
   created_at: string;
   relatedScheduleIds?: string[];
   teams?: Team[];
+  leaderIds?: string[];   // 리더로 지정된 멤버 ID 목록
 }
 
 /* ══════════════════════════════════════════
@@ -192,7 +195,16 @@ function CreateModal({
   const [allMembers,       setAllMembers]       = useState<Member[]>([]);
   const [memberQuery,      setMemberQuery]      = useState('');
   const [selectedMembers,  setSelectedMembers]  = useState<Member[]>([]);
+  const [leaderIds,        setLeaderIds]        = useState<string[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
+
+  const toggleLeader = (id: string) =>
+    setLeaderIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const removeMember = (id: string) => {
+    setSelectedMembers(prev => prev.filter(m => m.id !== id));
+    setLeaderIds(prev => prev.filter(x => x !== id));
+  };
 
   /* 관련 일정 */
   const [allSchedules,       setAllSchedules]       = useState<ScheduleItem[]>([]);
@@ -354,6 +366,7 @@ function CreateModal({
       tags: parsedTags,
       relatedScheduleIds,
       teams,
+      leaderIds,
     });
     reset();
   };
@@ -368,7 +381,7 @@ function CreateModal({
         {/* 헤더 */}
         <div className="shrink-0 flex items-center justify-between px-6 py-5 border-b border-black/10">
           <div>
-            <h2 className="text-lg font-black text-black">새 프로젝트 만들기</h2>
+            <h2 className="text-lg font-black text-black">팀 프로젝트 등록하기</h2>
           </div>
           <button type="button" onClick={handleClose}
             className="p-2 hover:bg-black/8 rounded-xl transition-colors">
@@ -464,19 +477,38 @@ function CreateModal({
               <p className="text-[10px] text-black/30 font-medium mb-3">최소 2인 이상 선택해주세요 {selectedMembers.length > 0 && <span className={selectedMembers.length >= 2 ? 'text-black/50 font-black' : 'text-red-400 font-black'}>({selectedMembers.length}명 선택됨)</span>}</p>
               {selectedMembers.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {selectedMembers.map(m => (
-                    <span key={m.id}
-                      className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full bg-black text-white text-xs font-bold">
-                      <Avatar member={m} size="sm" />
-                      {m.full_name}
-                      <button type="button"
-                        onClick={() => setSelectedMembers(prev => prev.filter(x => x.id !== m.id))}
-                        className="ml-0.5 text-white/60 hover:text-white">
-                        <X size={11} />
-                      </button>
-                    </span>
-                  ))}
+                  {selectedMembers.map(m => {
+                    const isLeader = leaderIds.includes(m.id);
+                    return (
+                      <span key={m.id}
+                        className={`inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full text-xs font-bold transition-all ${
+                          isLeader
+                            ? 'bg-amber-400 text-black ring-2 ring-amber-300'
+                            : 'bg-black text-white'
+                        }`}>
+                        <Avatar member={m} size="sm" />
+                        {m.full_name}
+                        {isLeader && <span className="text-[9px] font-black opacity-70">Leader</span>}
+                        {/* 리더 토글 */}
+                        <button type="button" onClick={() => toggleLeader(m.id)}
+                          title={isLeader ? '리더 해제' : '리더로 지정'}
+                          className={`transition-colors ${isLeader ? 'text-black/60 hover:text-black' : 'text-white/40 hover:text-amber-300'}`}>
+                          <Crown size={11} />
+                        </button>
+                        {/* 제거 */}
+                        <button type="button" onClick={() => removeMember(m.id)}
+                          className="ml-0.5 text-current/50 hover:text-current">
+                          <X size={11} />
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
+              )}
+              {selectedMembers.length > 0 && leaderIds.length === 0 && (
+                <p className="text-[10px] text-amber-500/80 font-medium mb-2 flex items-center gap-1">
+                  <Crown size={10} /> 팀원 칩의 왕관 아이콘을 눌러 리더를 지정하세요
+                </p>
               )}
               <div className="relative mb-2">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/40" />
@@ -948,7 +980,7 @@ function CreateModal({
               handleSubmit(fakeEvent);
             }}
             className="flex-[2] py-3 rounded-2xl bg-black text-white font-bold text-sm transition-all hover:bg-black/85 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]">
-            {isSubmitting ? '저장 중...' : '🚀 프로젝트 등록하기'}
+            {isSubmitting ? '저장 중...' : '🚀 팀 프로젝트 등록하기'}
           </button>
         </div>
 
@@ -958,17 +990,123 @@ function CreateModal({
 }
 
 /* ══════════════════════════════════════════
+   승인 대기 프로젝트 타입
+══════════════════════════════════════════ */
+interface PendingProject {
+  id: string;
+  title: string;
+  description: string | null;
+  field: string | null;
+  created_at: string;
+  tags: string[] | null;
+  is_recruiting: boolean;
+  creator_name: string;
+  creator_id: string;
+}
+
+/* ══════════════════════════════════════════
    메인 페이지
 ══════════════════════════════════════════ */
 export function AdminProjects() {
   const navigate = useNavigate();
   const { activeClubId } = useAuth();
-  const clubId = activeClubId;   // context에서 직접 — 동아리별 독립 보장
+  const clubId = activeClubId;
 
+  const [isModalOpen,  setIsModalOpen]  = useState(false);
   const [projects,    setProjects]    = useState<Project[]>([]);
   const [isLoading,   setIsLoading]   = useState(true);
-  const [isModalOpen,  setIsModalOpen]  = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /* 대시보드 "팀 프로젝트 등록하기" 버튼에서 넘어온 경우 즉시 모달 열기 */
+  useEffect(() => {
+    if (sessionStorage.getItem('openProjectModal') === '1') {
+      sessionStorage.removeItem('openProjectModal');
+      setIsModalOpen(true);
+    }
+  }, []);
+
+  /* ── 승인 대기 프로젝트 ── */
+  const [pendingProjects, setPendingProjects] = useState<PendingProject[]>([]);
+  const [pendingLoading,  setPendingLoading]  = useState(false);
+  const [approvingId,     setApprovingId]     = useState<string | null>(null);
+
+  const fetchPending = useCallback(async () => {
+    if (!clubId) return;
+    setPendingLoading(true);
+    try {
+      const { data } = await supabase
+        .from('projects')
+        .select('id, title, description, field, created_at, tags, is_recruiting, created_by, profiles(full_name)')
+        .eq('club_id', clubId)
+        .is('club_approved', null)
+        .eq('is_personal', true)
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setPendingProjects(data.map((p: any) => {
+          const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
+          return {
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            field: p.field,
+            created_at: p.created_at,
+            tags: p.tags,
+            is_recruiting: p.is_recruiting,
+            creator_id: p.created_by,
+            creator_name: profile?.full_name ?? '알 수 없음',
+          };
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPendingLoading(false);
+    }
+  }, [clubId]);
+
+  const handleApprove = async (projectId: string, approve: boolean) => {
+    setApprovingId(projectId);
+    try {
+      await supabase
+        .from('projects')
+        .update({ club_approved: approve })
+        .eq('id', projectId);
+      setPendingProjects(prev => prev.filter(p => p.id !== projectId));
+      if (approve) {
+        // 승인된 경우 프로젝트 목록에도 추가 (새로고침 없이 반영)
+        const { data } = await supabase
+          .from('projects')
+          .select('id, title, emoji, description, detail, start_date, end_date, status, thumbnail_url, created_at, tech_stack, tags')
+          .eq('id', projectId)
+          .single();
+        if (data) {
+          setProjects(prev => [{
+            id: data.id,
+            title: data.title,
+            emoji: data.emoji ?? '📁',
+            description: data.description ?? '',
+            detail: data.detail ?? '',
+            start_date: data.start_date ?? '',
+            end_date: data.end_date ?? '',
+            status: data.status ?? 'active',
+            thumbnail_url: data.thumbnail_url,
+            created_at: data.created_at,
+            techStack: data.tech_stack ?? [],
+            tags: data.tags ?? [],
+            participants: [],
+          }, ...prev]);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert('처리 중 오류가 발생했습니다.');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  useEffect(() => { fetchPending(); }, [fetchPending]);
 
   /* 프로젝트 목록 로드 */
   useEffect(() => {
@@ -977,6 +1115,7 @@ export function AdminProjects() {
     supabase.from('projects')
       .select('id, title, emoji, description, detail, start_date, end_date, status, thumbnail_url, created_at')
       .eq('club_id', clubId)
+      .or('club_approved.eq.true,is_personal.eq.false')   // 승인된 개인 프로젝트 or 운영진 직접 등록 프로젝트
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         interface ProjectRow {
@@ -1033,6 +1172,30 @@ export function AdminProjects() {
             teams:                data.teams ?? [],
           }).eq('id', inserted.id).then(() => {}); // silent fail if columns missing
 
+          /* ── 전체 팀원 활동 자동 동기화 ──
+             - 리더로 지정된 멤버 → role: 'leader'
+             - 나머지 팀원         → role: 'member'
+             → 모든 팀원의 포트폴리오 "내 활동"에 즉시 반영됨
+             → 동아리 관리자가 만든 프로젝트이므로 club_id 자동 연결
+          */
+          if (data.participants && data.participants.length > 0) {
+            const logs = data.participants.map(member => ({
+              user_id:   member.id,
+              title:     data.title,
+              image_url: data.thumbnail_url ?? null,
+              content:   JSON.stringify({
+                project_id:  inserted.id,
+                club_id:     clubId,
+                role:        data.leaderIds?.includes(member.id) ? 'leader' : 'member',
+                type:        'team_project',
+                description: data.description,
+                startDate:   data.start_date,
+                endDate:     data.end_date || null,
+              }),
+            }));
+            await supabase.from('activity_logs').insert(logs);
+          }
+
           /* 로컬 상태 업데이트 */
           const newProject: Project = {
             id: inserted.id,
@@ -1061,9 +1224,10 @@ export function AdminProjects() {
 
   /* 통계 */
   const stats = {
-    active: projects.filter(p => p.status === 'active').length,
-    closed: projects.filter(p => p.status === 'closed').length,
-    draft:  projects.filter(p => p.status === 'draft').length,
+    active:  projects.filter(p => p.status === 'active').length,
+    closed:  projects.filter(p => p.status === 'closed').length,
+    draft:   projects.filter(p => p.status === 'draft').length,
+    pending: pendingProjects.length,
   };
 
   return (
@@ -1078,26 +1242,123 @@ export function AdminProjects() {
           <h1 className="text-4xl font-black text-black mb-1">🚀 프로젝트 관리</h1>
           <p className="text-sm text-black/50 font-medium mb-6">동아리 프로젝트를 등록하고 팀을 구성하세요.</p>
           {/* 통계 */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {[
-              { label: '진행중', value: stats.active },
-              { label: '완료',   value: stats.closed },
-              { label: '준비중', value: stats.draft  },
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-black/3 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-black text-black">{value}</p>
-                <p className="text-xs text-black/40 font-bold mt-0.5">{label}</p>
+              { label: '진행중',    value: stats.active,  accent: false },
+              { label: '완료',      value: stats.closed,  accent: false },
+              { label: '준비중',    value: stats.draft,   accent: false },
+              { label: '승인대기',  value: stats.pending, accent: true  },
+            ].map(({ label, value, accent }) => (
+              <div key={label} className={`rounded-2xl p-4 text-center ${accent && value > 0 ? 'bg-orange-100' : 'bg-black/3'}`}>
+                <p className={`text-2xl font-black ${accent && value > 0 ? 'text-orange-600' : 'text-black'}`}>{value}</p>
+                <p className={`text-xs font-bold mt-0.5 ${accent && value > 0 ? 'text-orange-500' : 'text-black/40'}`}>{label}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* 새 프로젝트 버튼 */}
+        {/* ── 승인 대기 섹션 ── */}
+        {(pendingLoading || pendingProjects.length > 0) && (
+          <div className="rounded-3xl border-2 border-orange-200 bg-orange-50/60 overflow-hidden">
+            {/* 헤더 */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-orange-200">
+              <AlertCircle className="w-5 h-5 text-orange-500" />
+              <div className="flex-1">
+                <p className="font-black text-orange-700 text-sm">동아리 연결 승인 요청</p>
+                <p className="text-[11px] text-orange-500/80 font-medium">
+                  멤버가 등록한 개인 프로젝트를 동아리에 연결하려 합니다. 검토 후 승인/거절하세요.
+                </p>
+              </div>
+              {pendingProjects.length > 0 && (
+                <span className="px-2.5 py-1 bg-orange-500 text-white text-xs font-black rounded-full">
+                  {pendingProjects.length}건
+                </span>
+              )}
+            </div>
+
+            {/* 목록 */}
+            <div className="divide-y divide-orange-100">
+              {pendingLoading ? (
+                <div className="flex items-center justify-center py-8 gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+                  <span className="text-sm text-orange-400 font-medium">불러오는 중...</span>
+                </div>
+              ) : (
+                pendingProjects.map(p => (
+                  <div key={p.id} className="px-6 py-4 flex items-start gap-4">
+                    {/* 아이콘 */}
+                    <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center shrink-0">
+                      <User className="w-5 h-5 text-orange-400" />
+                    </div>
+                    {/* 내용 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        <span className="font-black text-black text-sm truncate">{p.title}</span>
+                        {p.field && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-bold shrink-0">
+                            {p.field}
+                          </span>
+                        )}
+                        {p.is_recruiting && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 font-bold shrink-0">
+                            팀원모집
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-black/50 font-medium mb-1">
+                        <span className="font-bold text-black/70">{p.creator_name}</span> · {new Date(p.created_at).toLocaleDateString('ko-KR')}
+                      </p>
+                      {p.description && (
+                        <p className="text-xs text-black/40 line-clamp-1 mb-1.5">{p.description}</p>
+                      )}
+                      {p.tags && p.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {p.tags.slice(0, 4).map(t => (
+                            <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/5 text-black/40 font-medium">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* 버튼 */}
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleApprove(p.id, false)}
+                        disabled={approvingId === p.id}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 text-red-500 text-xs font-bold hover:bg-red-50 transition-colors disabled:opacity-40"
+                      >
+                        {approvingId === p.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Ban className="w-3.5 h-3.5" />
+                        }
+                        거절
+                      </button>
+                      <button
+                        onClick={() => handleApprove(p.id, true)}
+                        disabled={approvingId === p.id}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black text-white text-xs font-bold hover:bg-black/80 transition-colors disabled:opacity-40"
+                      >
+                        {approvingId === p.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Check className="w-3.5 h-3.5" />
+                        }
+                        승인
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 팀 프로젝트 등록 버튼 */}
         <div className="flex justify-end">
           <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2 px-5 py-3 bg-black text-white font-bold text-sm rounded-2xl hover:bg-black/85 active:scale-95 transition-all">
-            <Plus size={16} /> 새 프로젝트 만들기
+            <Plus size={16} /> 팀 프로젝트 등록하기
           </button>
         </div>
 
@@ -1113,13 +1374,13 @@ export function AdminProjects() {
             /* Empty state */
             <div className="bg-white rounded-3xl border border-black/10 py-20 flex flex-col items-center justify-center gap-3">
               <Rocket className="w-10 h-10 text-black/20" />
-              <p className="text-sm font-bold text-black/40">등록된 프로젝트가 없습니다</p>
-              <p className="text-xs text-black/30">위의 버튼을 눌러 첫 프로젝트를 만들어보세요</p>
+              <p className="text-sm font-bold text-black/40">등록된 팀 프로젝트가 없습니다</p>
+              <p className="text-xs text-black/30">첫 팀 프로젝트를 만들고 팀원들과 함께 시작해보세요</p>
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="mt-2 flex items-center gap-1.5 px-4 py-2 bg-black text-white text-sm font-bold rounded-full hover:bg-black/85 transition-colors"
               >
-                <Plus size={14} /> 새 프로젝트 만들기
+                <Plus size={14} /> 팀 프로젝트 등록하기
               </button>
             </div>
           ) : (
@@ -1170,11 +1431,25 @@ export function AdminProjects() {
         </div>
       </div>
 
-      <CreateModal
+      <AdminCreateProjectModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreate}
-        isSubmitting={isSubmitting}
+        onSuccess={() => {
+          setIsModalOpen(false);
+          // 목록 새로고침
+          if (clubId) {
+            supabase.from('projects')
+              .select('id, title, emoji, description, detail, start_date, end_date, status, thumbnail_url, created_at')
+              .eq('club_id', clubId)
+              .or('club_approved.eq.true,is_personal.eq.false')
+              .order('created_at', { ascending: false })
+              .then(({ data }) => {
+                if (data) setProjects((data as any[]).map(p => ({
+                  ...p, techStack: p.tech_stack ?? [], tags: p.tags ?? [], participants: [],
+                })));
+              });
+          }
+        }}
         clubId={clubId}
       />
     </div>

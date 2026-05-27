@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { NotificationBell } from './NotificationBell';
 import {
-  Settings2, FolderOpen, ChevronDown, ChevronRight,
-  Settings, Megaphone as MegaphoneIcon, Archive as ArchiveIcon,
+  Settings2, ChevronDown, ChevronRight,
+  Settings, Megaphone as MegaphoneIcon,
   RefreshCw, Check, Building2, Loader2, LogOut, Plus, Trash2,
+  Shield,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -33,8 +35,18 @@ interface Club {
   deleted_at?: string | null;
 }
 
+interface LeaderClub {
+  id: string;
+  name: string;
+  logo_url?: string | null;
+  is_recruiting?: boolean | null;
+  deleted_at?: string | null;
+  created_at?: string | null;
+  myRole: string;
+}
+
 export const Navbar: React.FC = () => {
-  const { profile, isAdminMode, toggleAdminMode, signOut, activeClubId, switchClub } = useAuth();
+  const { profile, isAdminMode, enterAdminMode, exitAdminMode, signOut, activeClubId, switchClub } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -46,18 +58,6 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  // 토글 시 해당 모드의 홈으로 이동
-  const handleToggle = () => {
-    toggleAdminMode();
-    if (!isAdminMode) {
-      // USER → ADMIN 전환
-      navigate('/admin', { replace: true });
-    } else {
-      // ADMIN → USER 전환
-      navigate('/', { replace: true });
-    }
-  };
-
   const avatarUrl   = (profile as { avatar_url?: string } | null)?.avatar_url;
   const displayName = profile?.full_name || '김부원';
 
@@ -65,6 +65,10 @@ export const Navbar: React.FC = () => {
   const [activeClubName,  setActiveClubName]  = useState<string>('');
   const [activeClubLogo,  setActiveClubLogo]  = useState<string | null>(null);
   const [isClubsLoading,  setIsClubsLoading]  = useState(false);
+
+  /* 유저 모드 — Leader 활동 목록 */
+  const [leaderClubs,        setLeaderClubs]        = useState<LeaderClub[]>([]);
+  const [isLeaderLoading,    setIsLeaderLoading]    = useState(false);
 
   // 클럽 정보 fetch (어드민 모드일 때)
   const fetchMyClubs = async () => {
@@ -104,7 +108,40 @@ export const Navbar: React.FC = () => {
     return () => window.removeEventListener('club-settings-saved', handler);
   }, [profile?.id]);
 
+  /* 유저 모드 — 내가 Leader인 동아리 fetch */
+  useEffect(() => {
+    if (!profile?.id || isAdminMode) return;
+    setIsLeaderLoading(true);
+    supabase
+      .from('club_members')
+      .select('role, clubs(id, name, logo_url, is_recruiting, deleted_at, created_at)')
+      .eq('user_id', profile.id)
+      .in('role', ['ADMIN', 'LEADER', 'CAPTAIN'])
+      .then(({ data }) => {
+        if (!data) { setIsLeaderLoading(false); return; }
+        const rows = (data as any[]).map((m) => {
+          const c = Array.isArray(m.clubs) ? m.clubs[0] : m.clubs;
+          return c ? { ...c, myRole: m.role } as LeaderClub : null;
+        }).filter(Boolean) as LeaderClub[];
+
+        // 정렬: 삭제 안된 것 → 현재 모집중 → 최신순
+        rows.sort((a, b) => {
+          if (!!a.deleted_at !== !!b.deleted_at) return a.deleted_at ? 1 : -1;
+          if (!!a.is_recruiting !== !!b.is_recruiting) return a.is_recruiting ? -1 : 1;
+          return (b.created_at ?? '').localeCompare(a.created_at ?? '');
+        });
+        setLeaderClubs(rows);
+        setIsLeaderLoading(false);
+      });
+  }, [profile?.id, isAdminMode]);
+
   const clubName = activeClubName || profile?.univ_name || 'Club DX';
+
+  const handleSwitchToAdmin = (club: LeaderClub) => {
+    switchClub(club.id);
+    enterAdminMode();               // profile.role 무관하게 어드민 모드 강제 진입
+    navigate('/admin', { replace: true });
+  };
 
   const handleSwitchClub = (club: Club & { logo_url?: string }) => {
     switchClub(club.id);          // context에 저장 → 전체 앱에서 참조
@@ -174,13 +211,67 @@ export const Navbar: React.FC = () => {
                 <Settings2 className="h-4 w-4 text-white/60 shrink-0" />
                 ⚙️ 계정 정보
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => navigate('/portfolio')}
-                className="text-white hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
-              >
-                <FolderOpen className="h-4 w-4 text-white/60 shrink-0" />
-                📂 활동 이력
-              </DropdownMenuItem>
+
+              {/* 관리자 모드 — Leader 활동 서브메뉴 */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-white hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+                  <Shield className="h-4 w-4 text-white/60 shrink-0" />
+                  <span className="flex-1">관리자 모드</span>
+                  <ChevronRight className="h-3.5 w-3.5 text-white/40 ml-auto shrink-0" />
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent
+                  className="w-56 border border-white/15 shadow-2xl shadow-black/40 text-white"
+                  style={{ background: '#111111' }}
+                >
+                  {isLeaderLoading ? (
+                    <div className="flex items-center gap-2 px-3 py-3 text-sm text-white/50">
+                      <Loader2 className="h-4 w-4 animate-spin text-white/40" />
+                      불러오는 중...
+                    </div>
+                  ) : leaderClubs.length === 0 ? (
+                    <div className="px-3 py-3 text-xs text-white/30 text-center">
+                      운영 중인 활동이 없습니다
+                    </div>
+                  ) : (
+                    <>
+                      <DropdownMenuLabel className="text-[11px] text-white/50">
+                        내 Leader 활동 ({leaderClubs.length})
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-white/10" />
+                      {leaderClubs.map(club => (
+                        <DropdownMenuItem
+                          key={club.id}
+                          onSelect={() => handleSwitchToAdmin(club)}
+                          className={cn(
+                            'cursor-pointer gap-2',
+                            club.deleted_at
+                              ? 'opacity-50 text-white/40'
+                              : 'text-white hover:bg-white/10 focus:bg-white/10',
+                          )}
+                        >
+                          {/* 로고 or 이니셜 */}
+                          <span className="w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center shrink-0 overflow-hidden text-[10px] font-black text-white">
+                            {club.logo_url
+                              ? <img src={club.logo_url} className="w-full h-full object-cover" alt="" />
+                              : club.name.slice(0, 2)
+                            }
+                          </span>
+                          <span className={cn('flex-1 truncate text-sm', club.deleted_at && 'line-through')}>
+                            {club.name}
+                          </span>
+                          {/* 상태 표시 */}
+                          {club.deleted_at ? (
+                            <span className="text-[9px] text-red-400/70 font-bold shrink-0">삭제됨</span>
+                          ) : club.is_recruiting ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                          ) : null}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem
                 onSelect={handleSignOut}
@@ -234,14 +325,6 @@ export const Navbar: React.FC = () => {
               >
                 <MegaphoneIcon className="h-4 w-4 text-white/60 shrink-0" />
                 <span>📢 모집 공고 관리</span>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onSelect={() => navigate('/admin/archive')}
-                className="text-white hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
-              >
-                <ArchiveIcon className="h-4 w-4 text-white/60 shrink-0" />
-                <span>🗂️ 동아리 아카이브</span>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator className="bg-white/15" />
@@ -322,13 +405,15 @@ export const Navbar: React.FC = () => {
                           <DropdownMenuSeparator className="bg-white/15" />
                         </>
                       )}
-                      {/* 신규 동아리 만들기 */}
+                      {/* 유저 계정으로 전환 — 항상 표시 */}
                       <DropdownMenuItem
-                        onSelect={() => navigate('/clubs/create')}
+                        onSelect={() => { exitAdminMode(); navigate('/', { replace: true }); }}
                         className="text-white/60 hover:text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                       >
-                        <Plus className="h-4 w-4 text-white/40 shrink-0" />
-                        <span>신규 동아리 만들기</span>
+                        <span className="w-4 shrink-0 flex items-center justify-center">
+                          <LogOut className="h-3.5 w-3.5 text-white/40" />
+                        </span>
+                        <span className="flex-1">👤 유저 계정으로 전환</span>
                       </DropdownMenuItem>
                     </>
                   )}
@@ -339,47 +424,8 @@ export const Navbar: React.FC = () => {
           </DropdownMenu>
         )}
 
-        {/* ════ RIGHT SIDE: MODE TOGGLE ════ */}
-        <div className={cn(
-          "flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-sm shadow-sm transition-colors",
-          isAdminMode
-            ? "border border-white/20 bg-black/80"
-            : "border border-black/15 bg-white"
-        )}>
-          <span className={cn(
-            'text-[10px] font-black uppercase tracking-wider px-1',
-            !isAdminMode ? 'text-black' : 'text-white/50',
-          )}>
-            USER
-          </span>
-
-          <button
-            onClick={handleToggle}
-            className={cn(
-              'relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full',
-              'border-2 border-transparent transition-colors duration-200 outline-none items-center shadow-inner',
-              isAdminMode
-                ? 'bg-white'
-                : 'bg-white/20',
-            )}
-          >
-            <span className="sr-only">운영진 모드 토글</span>
-            <span className={cn(
-              'pointer-events-none inline-block h-4 w-4 transform rounded-full',
-              'shadow ring-0 transition duration-200 ease-in-out',
-              isAdminMode
-                ? 'bg-black translate-x-5'
-                : 'bg-black/40 translate-x-0',
-            )} />
-          </button>
-
-          <span className={cn(
-            'text-[10px] font-black uppercase tracking-wider px-1',
-            isAdminMode ? 'text-white' : 'text-white/50',
-          )}>
-            ADMIN
-          </span>
-        </div>
+        {/* ════ RIGHT SIDE — 알림 벨 ════ */}
+        <NotificationBell isAdmin={isAdminMode} />
 
       </div>
     </nav>

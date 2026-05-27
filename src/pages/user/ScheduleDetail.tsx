@@ -2,11 +2,11 @@
  * 월 단위 캘린더 + 동아리(club_name)별 그룹 목록.
  * 주차/주별 뷰는 사용하지 않습니다.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DayPicker, type DayButtonProps } from 'react-day-picker';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, Paperclip, Check, Clock, UserX } from 'lucide-react';
 import { BackButton } from '../../components/common/BackButton';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -170,6 +170,15 @@ export const ScheduleDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<CalendarItem | null>(null);
 
+  /* ── 지각/불참 신고 상태 ── */
+  const [reportType,       setReportType]       = useState<'late' | 'absent' | null>(null);
+  const [reportReason,     setReportReason]     = useState('');
+  const [reportFile,       setReportFile]       = useState<File | null>(null);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportDone,       setReportDone]       = useState(false);
+  const [reportError,      setReportError]      = useState('');
+  const reportFileRef = useRef<HTMLInputElement>(null);
+
   const ym = yearMonthKey(displayMonth);
 
   const loadAll = useCallback(async () => {
@@ -243,6 +252,81 @@ export const ScheduleDetail: React.FC = () => {
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  /* 모달이 바뀌면 신고 폼 초기화 */
+  useEffect(() => {
+    setReportType(null);
+    setReportReason('');
+    setReportFile(null);
+    setReportSubmitting(false);
+    setReportDone(false);
+    setReportError('');
+  }, [selected?.id]);
+
+  /* ── 신고 제출 ── */
+  const submitReport = async () => {
+    if (!reportType)          { setReportError('신고 유형을 선택해주세요.'); return; }
+    if (!reportReason.trim()) { setReportError('사유를 입력해주세요.'); return; }
+    if (!selected || !profile?.id) return;
+    setReportSubmitting(true);
+    setReportError('');
+    try {
+      /* 파일 업로드 */
+      let attachmentUrl: string | null = null;
+      if (reportFile) {
+        const ext  = reportFile.name.split('.').pop() ?? 'bin';
+        const path = `${profile.id}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('reports').upload(path, reportFile);
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from('reports').getPublicUrl(path);
+        attachmentUrl = urlData.publicUrl;
+      }
+
+      /* absence_reports 삽입 */
+      const scheduleId = selected.id.startsWith('s:') ? selected.id.slice(2) : selected.id;
+      const clubId     = selected.club?.id ?? null;
+      const { error: insertErr } = await supabase.from('absence_reports').insert({
+        schedule_id:    scheduleId,
+        user_id:        profile.id,
+        club_id:        clubId,
+        type:           reportType,
+        reason:         reportReason.trim(),
+        attachment_url: attachmentUrl,
+      });
+      if (insertErr) throw insertErr;
+
+      /* 운영진에게 알림 발송 */
+      if (clubId) {
+        const { data: admins } = await supabase
+          .from('club_members')
+          .select('user_id')
+          .eq('club_id', clubId)
+          .in('role', ['ADMIN', 'LEADER', 'CAPTAIN', 'admin', 'leader', 'captain']);
+        if (admins && admins.length > 0) {
+          const typeLabel = reportType === 'late' ? '지각' : '불참';
+          const userName  = (profile as Record<string, string>).full_name
+                         || (profile as Record<string, string>).name
+                         || profile.email
+                         || '부원';
+          await supabase.from('notifications').insert(
+            (admins as { user_id: string }[]).map(a => ({
+              user_id: a.user_id,
+              title:   `[${typeLabel} 신고] ${userName}`,
+              body:    `${selected.title} · ${reportReason.trim().slice(0, 50)}`,
+              type:    'attendance',
+              link:    '/admin',
+            }))
+          );
+        }
+      }
+      setReportDone(true);
+    } catch (e) {
+      console.error(e);
+      setReportError('제출 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
 
   const inThisMonth = useMemo(() => allItems.filter((i) => i.date.startsWith(ym)), [allItems, ym]);
   const byDate = useMemo(() => mapDateToItemsForMonth(allItems, ym), [allItems, ym]);
@@ -370,6 +454,110 @@ export const ScheduleDetail: React.FC = () => {
               </button>
             </div>
             <div className="max-h-[60vh] space-y-4 overflow-y-auto p-6">
+
+              {/* ── 지각/불참 신고 ── */}
+              {selected.kind === 'GENERAL' && selected.source === 'schedule' && (
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <UserX className="w-4 h-4 text-white/40" />
+                    <span className="text-[11px] font-black text-white/50 uppercase tracking-wide">지각 / 불참 신고</span>
+                  </div>
+
+                  {reportDone ? (
+                    <div className="flex flex-col items-center justify-center py-4 gap-2">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <Check className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <p className="text-sm font-black text-white/70">신고가 제출되었습니다.</p>
+                      <p className="text-xs text-white/35">운영진에게 알림이 전송되었습니다.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* 유형 선택 */}
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setReportType('late')}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-black transition-colors
+                            ${reportType === 'late'
+                              ? 'bg-amber-500 text-black'
+                              : 'bg-white/8 text-white/45 hover:bg-white/12'}`}
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          지각
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReportType('absent')}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-black transition-colors
+                            ${reportType === 'absent'
+                              ? 'bg-red-500 text-white'
+                              : 'bg-white/8 text-white/45 hover:bg-white/12'}`}
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          불참
+                        </button>
+                      </div>
+
+                      {/* 사유 입력 */}
+                      <textarea
+                        value={reportReason}
+                        onChange={e => setReportReason(e.target.value)}
+                        placeholder="사유를 입력해주세요..."
+                        rows={3}
+                        className="w-full rounded-xl bg-white/8 border border-white/10 text-white text-xs font-medium
+                                   placeholder:text-white/25 p-3 resize-none outline-none focus:border-white/25 mb-2"
+                      />
+
+                      {/* 파일 첨부 */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => reportFileRef.current?.click()}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/8 hover:bg-white/12
+                                     text-white/45 text-xs font-black transition-colors max-w-[200px]"
+                        >
+                          <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{reportFile ? reportFile.name : '증거 첨부'}</span>
+                        </button>
+                        {reportFile && (
+                          <button
+                            type="button"
+                            onClick={() => { setReportFile(null); if (reportFileRef.current) reportFileRef.current.value = ''; }}
+                            className="text-white/30 hover:text-white/60 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <input
+                          ref={reportFileRef}
+                          type="file"
+                          className="hidden"
+                          accept="image/*,video/*,.pdf"
+                          onChange={e => setReportFile(e.target.files?.[0] ?? null)}
+                        />
+                      </div>
+
+                      {reportError && (
+                        <p className="text-[11px] text-red-400 font-medium mb-2">{reportError}</p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={submitReport}
+                        disabled={reportSubmitting}
+                        className="w-full py-2.5 rounded-xl bg-white text-black font-black text-xs
+                                   hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        {reportSubmitting
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />제출 중...</>
+                          : '신고 제출'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="text-sm">
                 <span className="font-black text-white/60 text-xs uppercase tracking-wide">일시</span>
                 <p className="mt-1 text-white">

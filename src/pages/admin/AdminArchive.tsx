@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FolderOpen, Upload, Plus, Trash2, Download, FileText,
   ChevronRight, MoreVertical, Loader2, Lock, X,
   LayoutGrid, List, ChevronDown, ClipboardList, Users,
-  Image, Film, Music, Package,
+  Image, Film, Music, Package, Home, Archive,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { BackButton } from '../../components/common/BackButton';
 
 /* ══════════════════════════════════════════
    타입
@@ -108,6 +108,7 @@ function fmtDate(d: string) {
 ══════════════════════════════════════════ */
 export function AdminArchive() {
   const { activeClubId, profile } = useAuth();
+  const navigate = useNavigate();
   const [clubName,     setClubName]     = useState('');
   const [tab,          setTab]          = useState<Tab>('documents');
 
@@ -307,12 +308,11 @@ export function AdminArchive() {
      Render
   ══════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white pb-16">
 
       {/* ── 공통 헤더 ── */}
       <div className="bg-white border-b border-black/8 px-4 md:px-6 pt-16 pb-4">
         <div className="max-w-3xl mx-auto">
-          <BackButton to="/admin" label="뒤로가기" className="mb-3 text-black/60 hover:text-black" />
           <h1 className="text-xl font-black text-black tracking-tight">동아리 아카이브</h1>
         </div>
       </div>
@@ -696,6 +696,7 @@ export function AdminArchive() {
         )}
 
       </div>
+
     </div>
   );
 }

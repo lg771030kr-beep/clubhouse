@@ -23,6 +23,7 @@ export interface UserProfile {
   team_name?: string;        // 소속 팀/파트 이름 (예: "기획팀", "개발팀")
   phone?: string;            // 휴대폰 번호 (010-XXXX-XXXX)
   role: Role;
+  is_super_admin?: boolean;  // 플랫폼 슈퍼어드민
   created_at: string;
 }
 
@@ -52,21 +53,35 @@ export interface ClubMember {
 
 export interface Project {
   id: string;
-  club_id: string;
+  club_id?: string | null;   // 개인 프로젝트는 null
   title: string;
   description?: string;
   image_url?: string;
-  link?: string;             // 외부 링크 (발표자료 등)
-  github_url?: string;       // GitHub 저장소
-  demo_url?: string;         // 데모/배포 URL
-  start_date?: string;       // DATE (YYYY-MM-DD)
-  end_date?: string;         // DATE (YYYY-MM-DD)
-  leader_email?: string;     // 팀장 이메일
-  member_count?: number;     // 팀원 수 (캐시용)
+  link?: string;
+  github_url?: string;
+  demo_url?: string;
+  start_date?: string;
+  end_date?: string;
+  leader_email?: string;
+  member_count?: number;
+  emoji?: string;
+  status?: string;
+  // 개인 프로젝트 + 팀원모집
+  created_by?: string;
+  is_personal?: boolean;
+  is_recruiting?: boolean;
+  recruit_start?: string;
+  recruit_end?: string;
+  recruit_url?: string;
+  recruit_headcount?: string;
+  recruit_eligibility?: string;
+  tags?: string[];
+  field?: string;
   created_at: string;
   updated_at?: string;
-  // JOIN 시 포함될 수 있는 필드
+  // JOIN
   project_members?: ProjectMember[];
+  clubs?: { id: string; name: string } | null;
 }
 
 export interface ProjectMember {

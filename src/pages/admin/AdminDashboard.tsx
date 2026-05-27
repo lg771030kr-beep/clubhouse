@@ -4,8 +4,8 @@ import { motion } from 'motion/react';
 import {
   QrCode,
   CalendarDays, ChevronDown, Check,
-  X as XIcon, AlertCircle, CalendarPlus,
-  ChevronRight, Clock, MapPin, Rocket, Tag, Loader2,
+  X as XIcon, AlertCircle,
+  ChevronRight, Clock, MapPin, Wallet,
 } from 'lucide-react';
 import { AttendanceQR } from './AttendanceQR';
 import { ScheduleModal } from '../../components/admin/ScheduleModal';
@@ -54,8 +54,8 @@ export function AdminDashboard() {
   const { profile, activeClubId, loading: authLoading } = useAuth();
   const [todaySchedules,      setTodaySchedules]      = useState<{ id: string; title: string; time: string | null }[]>([]);
   const [selectedScheduleId,  setSelectedScheduleId]  = useState<string>('');
-  const [isQRModalOpen,       setIsQRModalOpen]       = useState(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isQRModalOpen,         setIsQRModalOpen]         = useState(false);
+  const [isScheduleModalOpen,   setIsScheduleModalOpen]   = useState(false);
   const [pendingSchedules,    setPendingSchedules]    = useState<UpcomingSchedule[]>([]);
 
   /* ── 동아리 정보 ── */
@@ -76,9 +76,12 @@ export function AdminDashboard() {
   const [upcomingAssignment, setUpcomingAssignment] = useState<UpcomingSchedule | null>(null);
   const [upcomingLoading,    setUpcomingLoading]    = useState(true);
 
-  /* ── 프로젝트 목록 ── */
-  const [projects,        setProjects]        = useState<{ id: string; title: string; emoji: string; status: string }[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
+  /* ── 회비 현황 ── */
+  const [grantTotal,      setGrantTotal]      = useState<number>(0);
+  const [membershipTotal, setMembershipTotal] = useState<number>(0);
+  const [hasGrantCat,     setHasGrantCat]     = useState<boolean>(false);
+  const [hasMemberCat,    setHasMemberCat]    = useState<boolean>(false);
+
 
   /* activeClubId가 바뀔 때마다 모든 데이터 재조회 */
   useEffect(() => {
@@ -97,7 +100,7 @@ export function AdminDashboard() {
       fetchTodaySchedules(),
       fetchPendingSchedules(),
       fetchUpcoming(),
-      fetchProjects(),
+      fetchFees(),
     ]);
   }, [activeClubId, authLoading]);
 
@@ -226,22 +229,25 @@ export function AdminDashboard() {
     }
   };
 
-  const fetchProjects = async () => {
-    const cId = activeClubId;
-    if (!cId) { setProjectsLoading(false); return; }
-    setProjectsLoading(true);
+  const fetchFees = async () => {
+    if (!activeClubId) return;
     try {
-      const { data } = await supabase
-        .from('projects')
-        .select('id, title, emoji, status')
-        .eq('club_id', cId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      setProjects(data ?? []);
+      const { data: cats } = await supabase
+        .from('club_fee_categories').select('id, type').eq('club_id', activeClubId);
+      const catList = (cats ?? []) as { id: string; type: string }[];
+      const grantIds = catList.filter(c => c.type === 'grant').map(c => c.id);
+      const membIds  = catList.filter(c => c.type === 'membership').map(c => c.id);
+      setHasGrantCat(grantIds.length > 0);
+      setHasMemberCat(membIds.length > 0);
+      if (!catList.length) { setGrantTotal(0); setMembershipTotal(0); return; }
+      const { data: recs } = await supabase
+        .from('club_fee_records').select('amount, category_id').in('category_id', catList.map(c => c.id));
+      const rows = (recs ?? []) as { amount: number; category_id: string }[];
+      setGrantTotal(rows.filter(r => grantIds.includes(r.category_id)).reduce((s, r) => s + (r.amount ?? 0), 0));
+      setMembershipTotal(rows.filter(r => membIds.includes(r.category_id)).reduce((s, r) => s + (r.amount ?? 0), 0));
     } catch {
-      setProjects([]);
-    } finally {
-      setProjectsLoading(false);
+      setGrantTotal(0);
+      setMembershipTotal(0);
     }
   };
 
@@ -320,7 +326,6 @@ export function AdminDashboard() {
           fetchTodaySchedules(),
           fetchPendingSchedules(),
           fetchUpcoming(),
-          fetchProjects(),
         ]);
       } catch {
         alert('복구 중 오류가 발생했습니다.');
@@ -385,7 +390,7 @@ export function AdminDashboard() {
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden text-black pt-16 pb-14 px-6 bg-white"
+        className="relative overflow-hidden text-black pt-10 pb-5 px-6 bg-white"
         style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
       >
         <div className="absolute top-0 inset-x-0 h-[1px]
@@ -393,7 +398,7 @@ export function AdminDashboard() {
         <div className="pointer-events-none absolute -top-20 -right-20 w-96 h-96
                         rounded-full bg-black/3 blur-3xl" />
         <div className="relative z-10 max-w-5xl mx-auto">
-          <span className="inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full text-[10px]
+          <span className="inline-flex items-center gap-1.5 mb-2 px-3 py-1 rounded-full text-[10px]
                            font-black tracking-widest uppercase bg-black/15 border border-black/20 text-black">
             <span className="dot-active-light dot-pulse-light" />
             Administrator
@@ -404,49 +409,49 @@ export function AdminDashboard() {
       </motion.header>
 
       {/* ── 콘텐츠 ── */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 relative z-20 space-y-6 pb-24">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-4 relative z-20 space-y-4 pb-24">
 
         {/* ── 3 Key Metrics ── */}
         <motion.section
           custom={0} variants={fadeUp} initial="hidden" animate="visible"
-          className="bg-white rounded-3xl border border-black/20 p-6"
+          className="bg-white rounded-3xl border border-black/20 p-4"
         >
-          <h2 className="text-xl font-black text-black mb-5">✨ 동아리 현황</h2>
+          <h2 className="text-base font-black text-black mb-3">✨ 동아리 현황</h2>
           <div className="grid grid-cols-3 divide-x divide-black/20">
 
             {/* 총 인원 */}
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/admin/members')}
-              className="flex flex-col items-center justify-center py-5 px-4 hover:bg-black/5 cursor-pointer transition-colors"
+              className="flex flex-col items-center justify-center py-3 px-3 hover:bg-black/5 cursor-pointer transition-colors"
             >
               <div className="text-center w-full">
-                <div className="text-sm font-bold text-black/70 mb-2">총 인원</div>
-                <div className="flex items-baseline justify-center gap-1 mb-1">
+                <div className="text-xs font-bold text-black/70 mb-1">총 인원</div>
+                <div className="flex items-baseline justify-center gap-1 mb-0.5">
                   {metricsLoading
                     ? <span className="text-2xl font-black text-black/30">—</span>
                     : <span className="text-2xl font-black text-black">{totalMembers}</span>
                   }
                   <span className="text-xs text-black/60">명</span>
                 </div>
-                <div className="text-xs text-black/60">클릭하여 부원 관리</div>
+                <div className="text-[11px] text-black/60">클릭하여 부원 관리</div>
               </div>
             </motion.button>
 
             {/* 오늘 출석 */}
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => navigate(`/admin/attendance?date=${todayYMD()}`)}
-              className="flex flex-col items-center justify-center py-5 px-4 hover:bg-black/5 cursor-pointer transition-colors"
+              className="flex flex-col items-center justify-center py-3 px-3 hover:bg-black/5 cursor-pointer transition-colors"
             >
               <div className="text-center w-full">
-                <div className="text-sm font-bold text-black/70 mb-2">오늘 출석</div>
-                <div className="flex items-baseline justify-center gap-1 mb-1">
+                <div className="text-xs font-bold text-black/70 mb-1">오늘 출석</div>
+                <div className="flex items-baseline justify-center gap-1 mb-0.5">
                   {metricsLoading
                     ? <span className="text-2xl font-black text-black/30">—</span>
                     : <span className="text-2xl font-black text-black">{todayAttendance}</span>
                   }
                   <span className="text-xs text-black/60">명</span>
                 </div>
-                <div className="text-xs text-black/60">
+                <div className="text-[11px] text-black/60">
                   {!metricsLoading && totalMembers > 0
                     ? `출석률 ${Math.round((todayAttendance / totalMembers) * 100)}%`
                     : '클릭하여 출결 관리'}
@@ -457,18 +462,18 @@ export function AdminDashboard() {
             {/* 활성 과제 */}
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/admin/assignments?filter=pending')}
-              className="flex flex-col items-center justify-center py-5 px-4 hover:bg-black/5 cursor-pointer transition-colors"
+              className="flex flex-col items-center justify-center py-3 px-3 hover:bg-black/5 cursor-pointer transition-colors"
             >
               <div className="text-center w-full">
-                <div className="text-sm font-bold text-black/70 mb-2">활성 과제</div>
-                <div className="flex items-baseline justify-center gap-1 mb-1">
+                <div className="text-xs font-bold text-black/70 mb-1">활성 과제</div>
+                <div className="flex items-baseline justify-center gap-1 mb-0.5">
                   {metricsLoading
                     ? <span className="text-2xl font-black text-black/30">—</span>
                     : <span className="text-2xl font-black text-black">{pendingAssignCount}</span>
                   }
                   <span className="text-xs text-black/60">건</span>
                 </div>
-                <div className="text-xs text-black/60">클릭하여 제출 현황</div>
+                <div className="text-[11px] text-black/60">클릭하여 제출 현황</div>
               </div>
             </motion.button>
           </div>
@@ -523,19 +528,9 @@ export function AdminDashboard() {
         {/* ── 출석 QR ── */}
         <motion.section
           custom={2} variants={fadeUp} initial="hidden" animate="visible"
-          className="bg-white rounded-3xl p-7 relative overflow-hidden border border-black/20"
+          className="bg-white rounded-3xl p-4 relative overflow-hidden border border-black/20"
         >
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="p-2 rounded-xl bg-black/8 border border-black/20">
-              <QrCode className="w-4 h-4 text-black" />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-black">출석 QR 시작하기</h2>
-              <p className="text-xs text-black/60 mt-0.5">오늘 일정을 선택하고 QR을 생성하세요</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
             <div className="space-y-1.5">
               <label className="text-black/70 block font-bold text-sm">오늘의 일정 선택</label>
               <div className="relative">
@@ -580,9 +575,9 @@ export function AdminDashboard() {
         {/* ── 다가오는 일정 미리보기 ── */}
         <motion.section
           custom={3} variants={fadeUp} initial="hidden" animate="visible"
-          className="bg-white rounded-3xl p-6 border border-black/20"
+          className="bg-white rounded-3xl p-4 border border-black/20"
         >
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-black/8 border border-black/20">
                 <CalendarDays className="w-4 h-4 text-black" />
@@ -662,93 +657,63 @@ export function AdminDashboard() {
             </div>
           )}
 
-          <button
-            onClick={() => setIsScheduleModalOpen(true)}
-            className="mt-4 w-full py-3 rounded-full text-xs font-black
-                       bg-black text-white hover:bg-black/90
-                       transition-colors flex items-center justify-center gap-1.5"
-          >
-            <CalendarPlus className="w-3.5 h-3.5" />
-            일정 및 과제 추가하기
-          </button>
         </motion.section>
 
-        {/* ── 프로젝트(팀) 관리 ── */}
+        {/* ── 회비 현황 ── */}
         <motion.section
           custom={4} variants={fadeUp} initial="hidden" animate="visible"
-          className="bg-white rounded-3xl p-6 border border-black/20"
+          className="bg-white rounded-3xl p-4 border border-black/20"
         >
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-black/8 border border-black/20">
-                <Rocket className="w-4 h-4 text-black" />
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-xl bg-black/6 border border-black/15">
+                <Wallet className="w-4 h-4 text-black/60" />
               </div>
-              <div>
-                <h2 className="text-base font-black text-black">프로젝트(팀) 관리</h2>
-                <p className="text-xs text-black/60 mt-0.5">동아리 내 팀 프로젝트를 관리하세요</p>
-              </div>
+              <h2 className="text-sm font-black text-black">회비 현황</h2>
             </div>
-            {projects.length > 0 && (
-              <button
-                onClick={() => navigate('/admin/projects')}
-                className="flex items-center gap-1 text-xs font-black text-black/50 hover:text-black transition-colors"
-              >
-                전체 보기 <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/admin/fees')}
+              className="text-[11px] font-black text-black/40 hover:text-black transition-colors flex items-center gap-0.5"
+            >
+              상세히보기 <ChevronRight className="w-3 h-3" />
+            </button>
           </div>
 
-          {projectsLoading ? (
-            <div className="flex items-center justify-center py-8 gap-2 text-black/30">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-xs font-black">불러오는 중...</span>
-            </div>
-          ) : projects.length === 0 ? (
-            <div className="py-10 flex flex-col items-center justify-center gap-2">
-              <div className="w-12 h-12 rounded-2xl bg-black/5 flex items-center justify-center mb-1">
-                <Rocket className="w-6 h-6 text-black/20" />
-              </div>
-              <p className="text-sm font-black text-black/40">아직 등록된 프로젝트가 없습니다</p>
-              <p className="text-xs text-black/25">첫 번째 팀 프로젝트를 만들어보세요!</p>
+          {/* 카테고리 없을 때 */}
+          {!hasGrantCat && !hasMemberCat ? (
+            <div className="flex flex-col items-center justify-center py-5 rounded-2xl border border-black/10 bg-black/[0.02]">
+              <Wallet className="w-6 h-6 text-black/15 mb-1.5" />
+              <p className="text-sm font-black text-black/30">회비 없음</p>
+              <p className="text-[11px] text-black/20 mt-0.5 font-medium">상세히보기에서 회비 구분을 추가하세요</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {projects.map(p => (
-                <motion.button
-                  key={p.id}
-                  whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate(`/admin/projects/${p.id}`)}
-                  className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl border border-black/12
-                             hover:bg-black/[0.02] transition-colors text-left"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-black/8 flex items-center justify-center text-lg shrink-0">
-                    {p.emoji || '🚀'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-black text-black text-sm truncate">{p.title}</p>
-                  </div>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
-                    p.status === 'active'  ? 'bg-black text-white' :
-                    p.status === 'closed' ? 'bg-black/15 text-black/50' :
-                    'bg-black/8 text-black/50 border border-black/20'
-                  }`}>
-                    {p.status === 'active' ? '진행 중' : p.status === 'closed' ? '완료' : '준비 중'}
-                  </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-black/20 shrink-0" />
-                </motion.button>
-              ))}
+            <div className="grid grid-cols-2 divide-x divide-black/10 rounded-2xl border border-black/10 overflow-hidden">
+              {/* 지원금 */}
+              <div className="flex flex-col items-center justify-center py-4 px-3 bg-black/[0.02]">
+                <span className="text-[10px] font-black text-black/40 tracking-wider mb-1">지원금 합계</span>
+                {hasGrantCat ? (
+                  <>
+                    <span className="text-xl font-black text-black">{grantTotal.toLocaleString()}</span>
+                    <span className="text-[10px] text-black/35 font-medium mt-0.5">원</span>
+                  </>
+                ) : (
+                  <span className="text-sm font-black text-black/25 mt-1">없음</span>
+                )}
+              </div>
+              {/* 자체 회비 */}
+              <div className="flex flex-col items-center justify-center py-4 px-3">
+                <span className="text-[10px] font-black text-black/40 tracking-wider mb-1">자체 회비 합계</span>
+                {hasMemberCat ? (
+                  <>
+                    <span className="text-xl font-black text-black">{membershipTotal.toLocaleString()}</span>
+                    <span className="text-[10px] text-black/35 font-medium mt-0.5">원</span>
+                  </>
+                ) : (
+                  <span className="text-sm font-black text-black/25 mt-1">없음</span>
+                )}
+              </div>
             </div>
           )}
-
-          <button
-            onClick={() => navigate('/admin/projects')}
-            className="mt-3 w-full py-3 rounded-full text-xs font-black
-                       border border-black/20 text-black/60 hover:bg-black/5 hover:text-black
-                       transition-colors flex items-center justify-center gap-1.5"
-          >
-            <Tag className="w-3.5 h-3.5" />
-            {projects.length === 0 ? '첫 프로젝트 등록하기' : '프로젝트 관리 페이지로'}
-          </button>
         </motion.section>
 
       </div>
